@@ -1,0 +1,132 @@
+"""云雾API 异步 HTTP 客户端
+支持两种格式:
+  1. OpenAI 兼容格式: POST /v1/images/generations — 即时返回
+  2. Replicate 格式:   POST /replicate/v1/models/{model}/predictions — 异步任务 + 轮询
+"""
+
+import asyncio
+import time
+import httpx
+from backend.config import settings
+
+
+class YunwuAPIError(Exception):
+    """上游 API 错误"""
+    pass
+
+
+class YunwuClient:
+    """云雾API 客户端"""
+
+    def __init__(self):
+        self._timeout = 120.0
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {settings.yunwu_api_key}",
+            "Content-Type": "application/json",
+        }
+
+    # ── OpenAI 格式：即时返回 ──────────────────────────────────────
+
+    async def openai_generate(self, prompt: str, model: str = "gpt-image-2",
+                               size: str = "1024x1024", n: int = 1) -> dict:
+        """调用 OpenAI 兼容的 /v1/images/generations 接口（即时返回）"""
+        base_url = settings.yunwu_base_url.rstrip("/")
+
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "n": n,
+            "size": size,
+        }
+
+        url = f"{base_url}/v1/images/generations"
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(url, headers=self._headers(), json=payload)
+
+            if resp.status_code != 200:
+                raise YunwuAPIError(
+                    f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}"
+                )
+
+            return resp.json()
+
+    # ── Replicate 格式：异步任务 + 轮询 ────────────────────────────
+
+    async def create_prediction(self, prompt: str, aspect_ratio: str = "1:1",
+                                 megapixels: str = "1", num_outputs: int = 1,
+                                 output_format: str = "jpg", output_quality: int = 80,
+                                 num_inference_steps: int = 4,
+                                 model: str = "black-forest-labs/flux-schnell") -> dict:
+        """创建 Replicate 格式预测任务"""
+        base_url = settings.yunwu_base_url.rstrip("/")
+
+        payload = {
+            "input": {
+                "prompt": prompt,
+                "aspect_ratio": aspect_ratio,
+                "megapixels": megapixels,
+                "num_outputs": num_outputs,
+                "output_format": output_format,
+                "output_quality": output_quality,
+                "num_inference_steps": num_inference_steps,
+            }
+        }
+
+        url = f"{base_url}/replicate/v1/models/{model}/predictions"
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(url, headers=self._headers(), json=payload)
+
+            if resp.status_code not in (200, 201):
+                raise YunwuAPIError(
+                    f"创建任务失败 ({resp.status_code}): {resp.text[:500]}"
+                )
+
+            return resp.json()
+
+    async def get_prediction(self, task_id: str) -> dict:
+        """查询 Replicate 格式预测任务状态"""
+        base_url = settings.yunwu_base_url.rstrip("/")
+        url = f"{base_url}/replicate/v1/predictions/{task_id}"
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.get(url, headers=self._headers())
+
+            if resp.status_code != 200:
+                raise YunwuAPIError(
+                    f"查询任务失败 ({resp.status_code}): {resp.text[:500]}"
+                )
+
+            return resp.json()
+
+    async def wait_for_completion(self, task_id: str, on_progress=None,
+                                   poll_interval: float = 0.5) -> dict:
+        """轮询等待 Replicate 任务完成"""
+        t0 = time.time()
+
+        while True:
+            data = await self.get_prediction(task_id)
+            status = data.get("status", "")
+
+            if on_progress:
+                on_progress({
+                    "status": status,
+                    "logs": data.get("logs", ""),
+                    "elapsed": time.time() - t0,
+                })
+
+            if status in ("succeeded", "failed", "canceled"):
+                data["_elapsed"] = time.time() - t0
+                return data
+
+            if time.time() - t0 > 300:
+                raise YunwuAPIError("任务超时 (5分钟)")
+
+            await asyncio.sleep(poll_interval)
+
+
+# 全局单例
+yunwu_client = YunwuClient()

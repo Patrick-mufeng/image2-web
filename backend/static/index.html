@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>觅图 — AI 图片生成</title>
+  <link rel="stylesheet" href="/css/style.css?v=6">
+</head>
+<body>
+  <div id="app">
+    <!-- ═══ Header ═══ -->
+    <header class="hdr">
+      <div class="hdr-l">
+        <div class="hdr-logo">🎨</div>
+        <span class="hdr-title" style="letter-spacing:0.18em">觅<em style="letter-spacing:0.18em">图</em></span>
+      </div>
+      <div class="hdr-r">
+        <span class="hdr-status" id="apiStatus">
+          <span class="hdr-dot" id="statusDot"></span>
+          <span id="statusText">检查中</span>
+        </span>
+        <button class="btn btn-icon" id="btnTheme" title="切换主题" aria-label="切换主题">
+          <span id="themeIcon">🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ═══ Body ═══ -->
+    <div class="body">
+      <!-- ─── Nav ─── -->
+      <nav class="nav" id="nav">
+        <button class="nav-item active" data-tab="0">
+          <span class="nav-icon">🔑</span>
+          <span class="nav-label">Key 设置</span>
+        </button>
+        <button class="nav-item" data-tab="1">
+          <span class="nav-icon">🎨</span>
+          <span class="nav-label">图片生成</span>
+        </button>
+        <button class="nav-item" data-tab="2">
+          <span class="nav-icon">📜</span>
+          <span class="nav-label">生成历史</span>
+        </button>
+        <button class="nav-item" data-tab="3">
+          <span class="nav-icon">📚</span>
+          <span class="nav-label">案例展示</span>
+        </button>
+        <button class="nav-item" data-tab="4">
+          <span class="nav-icon">🖼️</span>
+          <span class="nav-label">元数据</span>
+        </button>
+        <button class="nav-item" data-tab="5">
+          <span class="nav-icon">📡</span>
+          <span class="nav-label">实时监控</span>
+        </button>
+        <div class="nav-footer">
+          <span class="nav-author">作者：Patrick</span>
+          <span class="nav-version">版本：V2.1</span>
+        </div>
+      </nav>
+
+      <!-- ─── Content ─── -->
+      <main class="content">
+
+        <!-- ═══ TAB 0: Key Settings ═══ -->
+        <section class="tab-pane active" id="tab0">
+          <div class="settings-wrap">
+            <div class="page page-settings">
+              <h2 class="page-title">Key 设置</h2>
+              <p class="page-desc">配置 API 连接信息</p>
+              <div class="s-card">
+                <div class="s-row">
+                  <label>连接状态</label>
+                  <div id="pageStatus"></div>
+                </div>
+                <div class="s-row">
+                  <label for="pageBaseUrl">Base URL</label>
+                  <input type="text" id="pageBaseUrl" placeholder="https://yunwu.ai" spellcheck="false">
+                </div>
+                <div class="s-row">
+                  <label for="pageApiKey">API Key</label>
+                  <input type="password" id="pageApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
+                  <p class="s-hint">保存后即刻生效，无需重启</p>
+                </div>
+                <button class="btn btn-p" id="pageSaveBtn">保存设置</button>
+              </div>
+            </div>
+            <div class="page page-info">
+              <h2 class="page-title">📖 帮助信息</h2>
+              <div class="info-card">
+                <h3>🔑 获取 API Key</h3>
+                <p>注册 <a href="https://yunwu.ai/register?aff=zM1f" target="_blank" class="info-link">云雾API</a>，在控制台创建 API Key。</p>
+                <p style="margin-top:6px">推荐使用 <strong>image2 模型</strong>，支持 2K、4K 图片生成。</p>
+              </div>
+              <div class="info-card">
+                <h3>💰 价格说明</h3>
+                <p>平均每张约 <strong>0.5 元</strong> 左右。系统会自动分组生成，不同分组价格略有差异，由中转站决定。</p>
+              </div>
+              <div class="info-card">
+                <h3>📝 使用说明</h3>
+                <ul class="info-list">
+                  <li>填入 Base URL 和 API Key，点击保存</li>
+                  <li>切换到「图片生成」标签，选择比例和模型</li>
+                  <li>输入提示词（支持中文/英文），点击生成</li>
+                  <li>支持独立提示词模式：每行一个提示词，各生成一张</li>
+                  <li>「风格模板」可快速套用结构化提示词</li>
+                  <li>生成结果可下载、复制链接、重试</li>
+                </ul>
+              </div>
+              <div class="info-card">
+                <h3>🎯 特色功能</h3>
+                <ul class="info-list">
+                  <li>实时监控：查看每次请求的完整 JSON</li>
+                  <li>生成历史：保存所有生成记录</li>
+                  <li>案例展示：内置 453 个案例参考</li>
+                  <li>元数据编辑：批量修改图片 EXIF 信息</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ TAB 1: Image Generation ═══ -->
+        <section class="tab-pane" id="tab1">
+          <div class="page page-gen">
+            <!-- Control Bar -->
+            <div class="ctl">
+              <div class="ctl-g">
+                <label class="ctl-lbl">比例</label>
+                <div class="ctl-pills" id="ratioGrid"></div>
+              </div>
+              <div class="ctl-g" style="min-width:120px">
+                <label class="ctl-lbl">分辨率</label>
+                <select class="ctl-sel" id="resolutionSelect">
+                  <option value="1">1MP · 标准</option>
+                  <option value="2">2MP · 高清</option>
+                  <option value="4">4MP · 超清</option>
+                </select>
+              </div>
+              <div class="ctl-g" style="min-width:150px">
+                <label class="ctl-lbl">模型</label>
+                <select class="ctl-sel" id="modelSelect"><option>加载中...</option></select>
+              </div>
+              <div class="ctl-g" style="min-width:140px">
+                <label class="ctl-lbl">风格模板</label>
+                <select class="ctl-sel" id="templateSelect">
+                  <option value="">无模板</option>
+                </select>
+              </div>
+              <div class="ctl-g">
+                <label class="ctl-lbl">数量</label>
+                <div class="ctl-pills" id="countGroup">
+                  <button class="p-btn active" data-count="1">1</button>
+                  <button class="p-btn" data-count="2">2</button>
+                  <button class="p-btn" data-count="3">3</button>
+                  <button class="p-btn" data-count="4">4</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gen Body: Left Prompt + Right Results -->
+            <div class="gen-split">
+              <!-- Left: Prompt -->
+              <div class="gen-left">
+                <div class="prompt-area">
+                  <textarea id="promptInput" placeholder="描述你想要生成的图片…" maxlength="4000"></textarea>
+                  <div class="prompt-foot">
+                    <span class="char-count" id="charCount">0 / 4000</span>
+                    <label class="tog">
+                      <input type="checkbox" id="multiMode">
+                      <span class="tog-track"></span>
+                      <span class="tog-lbl">独立模式 <span class="tog-ht" id="multiHint">每行各一张</span></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="prompt-acts">
+                  <button class="btn gen-btn" id="btnGenerate" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    生成
+                  </button>
+                  <button class="btn btn-s" id="btnCancel" style="display:none">取消</button>
+                </div>
+              </div>
+
+              <!-- Right: Results -->
+              <div class="gen-right">
+                <div class="g-empty" id="emptyState">
+                  <div class="g-empty-icon">🎨</div>
+                  <p>输入描述词，点击生成</p>
+                </div>
+
+                <div class="g-prog" id="genBox" style="display:none">
+                  <div class="g-prog-h">
+                    <span>⚡ 生成中</span>
+                    <span class="g-bdg" id="genBadge">处理中</span>
+                  </div>
+                  <div class="g-bar"><div class="g-fill" id="genBar"></div></div>
+                  <div class="g-log" id="genLog"></div>
+                </div>
+
+                <div class="g-res" id="resultsWrap">
+                  <div class="g-res-h">
+                    <span>🖼️ 生成结果</span>
+                    <span class="g-res-c" id="resultsCount"></span>
+                    <div class="g-res-acts">
+                      <button class="btn btn-s btn-sm" id="btnRetry" style="display:none">🔄 重试</button>
+                      <button class="btn btn-s btn-sm" id="btnDownloadAll" style="display:none">📥 全部下载</button>
+                    </div>
+                  </div>
+                  <div class="g-grid" id="imgGrid"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ TAB 2: History ═══ -->
+        <section class="tab-pane" id="tab2">
+          <div class="page">
+            <div class="page-h">
+              <h2 class="page-title">生成历史</h2>
+              <button class="btn btn-s btn-sm" id="btnClearHistory">清空全部</button>
+            </div>
+            <div class="hist-grid" id="historyGrid"></div>
+            <div class="hist-empty" id="historyEmpty">暂无生成记录</div>
+            <div class="hist-pages" id="historyPages"></div>
+          </div>
+        </section>
+
+        <!-- ═══ TAB 3: Case Browser ═══ -->
+        <section class="tab-pane" id="tab3">
+          <div class="page">
+            <div class="page-h">
+              <h2 class="page-title">📚 案例展示</h2>
+              <span class="case-count" id="caseCount">加载中...</span>
+            </div>
+            <div class="case-filter" id="caseFilter">
+              <button class="cf-btn active" data-cat="">全部</button>
+            </div>
+            <div class="case-grid" id="caseGrid"></div>
+            <div class="hist-empty" id="caseEmpty" style="display:none">暂无案例</div>
+            <div class="hist-pages" id="casePages"></div>
+          </div>
+        </section>
+
+        <!-- ═══ TAB 4: Metadata ═══ -->
+        <section class="tab-pane" id="tab4">
+          <div class="page">
+            <div class="page-h" style="flex-direction:column;align-items:flex-start;gap:2px">
+              <h2 class="page-title">🖼️ 元数据</h2>
+              <p class="page-desc" style="margin-bottom:0">批量修改图片元数据，减少平台对 AI 识别</p>
+            </div>
+            <div class="meta-body">
+              <!-- Top: Upload bar (always visible) -->
+              <div class="meta-upload" id="metaDrop">
+                <div class="mu-left">
+                  <span class="mu-icon">📸</span>
+                  <span><strong>拖拽图片到此处</strong> 或 <span class="mu-link" id="btnMetaBrowse">点击选择</span></span>
+                  <span class="mu-hint">JPG / PNG / WebP / TIFF</span>
+                </div>
+                <div class="mu-right" id="metaFileInfo">未选择文件</div>
+                <input type="file" id="metaFileInput" accept="image/*" multiple style="display:none">
+              </div>
+
+              <!-- Main: Left Controls + Right Thumbnails -->
+              <div class="meta-main">
+                <!-- Left: Controls -->
+                <div class="meta-left">
+                  <div class="meta-presets">
+                    <label class="ctl-lbl">PS 预设</label>
+                    <select class="ctl-sel" id="metaPreset">
+                      <option value="">选择预设...</option>
+                    </select>
+                  </div>
+                  <div class="mf-row">
+                    <label>作者 (Artist)</label>
+                    <input type="text" id="metaArtist" placeholder="摄影师姓名" spellcheck="false">
+                  </div>
+                  <div class="mf-row">
+                    <label>版权 (Copyright)</label>
+                    <input type="text" id="metaCopyright" placeholder="Copyright © 2024 ..." spellcheck="false">
+                  </div>
+                  <div class="mf-row">
+                    <label>描述 (Description)</label>
+                    <input type="text" id="metaDescription" placeholder="图片描述" spellcheck="false">
+                  </div>
+                  <div class="mf-row">
+                    <label>软件 (Software)</label>
+                    <input type="text" id="metaSoftware" placeholder="Adobe Photoshop 25.0" spellcheck="false">
+                  </div>
+                  <div class="mf-actions" style="flex-wrap:wrap">
+                    <button class="btn btn-p" id="btnMetaWrite" style="flex:1">💾 保存</button>
+                    <button class="btn btn-s" id="btnMetaBatch" style="flex:1">📦 批量处理全部</button>
+                  </div>
+                  <div class="meta-exif" id="metaExif">
+                    <div class="ctl-lbl" style="margin-bottom:4px">EXIF 信息</div>
+                    <pre class="meta-exif-content" id="metaExifContent">暂无</pre>
+                  </div>
+                </div>
+                <!-- Right: Thumbnails grid -->
+                <div class="meta-right" id="metaRight">
+                  <div class="meta-thumbs" id="metaThumbs">
+                    <div class="meta-thumbs-empty">拖拽图片到上方上传栏</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Batch progress -->
+              <div class="meta-batch" id="metaBatch" style="display:none">
+                <div class="g-prog-h"><span>📦 批量处理</span><span class="g-bdg" id="metaBatchStatus"></span></div>
+                <div class="g-bar"><div class="g-fill idet" id="metaBatchBar"></div></div>
+                <div class="g-log" id="metaBatchLog" style="max-height:120px"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ TAB 5: Real-time Monitor ═══ -->
+        <section class="tab-pane" id="tab5">
+          <div class="page">
+            <div class="page-h">
+              <h2 class="page-title">实时监控</h2>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="mon-live" id="monLive">● 等待请求</span>
+                <button class="btn btn-s btn-sm" id="btnClearMonitor" style="display:none">清空</button>
+              </div>
+            </div>
+            <div class="mon-empty" id="monEmpty">
+              <p>暂无请求记录。执行一次图片生成后，请求与响应的详细信息将实时显示。</p>
+            </div>
+            <div class="mon-body" id="monBody" style="display:none">
+              <div class="mon-panels">
+                <div class="mon-p">
+                  <div class="mon-p-h">
+                    <span>📤 请求</span>
+                    <span class="mon-tag">REQUEST</span>
+                  </div>
+                  <pre class="mon-code" id="monReq">暂无</pre>
+                </div>
+                <div class="mon-p">
+                  <div class="mon-p-h">
+                    <span>📥 响应</span>
+                    <span class="mon-tag" id="monResTag">RECEIVED</span>
+                  </div>
+                  <pre class="mon-code" id="monRes">暂无</pre>
+                </div>
+              </div>
+              <div class="mon-tl" id="monTimeline">
+                <div class="tl-i active"><span class="tl-d"></span><span>请求发送</span></div>
+                <div class="tl-i" id="tlProcess"><span class="tl-d"></span><span>处理中</span></div>
+                <div class="tl-i" id="tlDone"><span class="tl-d"></span><span>完成</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- ═══ Toast ═══ -->
+    <div class="toast-wrap" id="toastWrap"></div>
+  </div>
+
+  <!-- ═══ Case Detail Modal ═══ -->
+  <div class="modal-bg" id="caseModal" style="display:none">
+    <div class="modal modal-wide" style="max-width:960px;width:80%">
+      <div class="modal-h">
+        <h2>📚 案例详情</h2>
+        <button class="btn btn-s btn-sm" id="btnCloseCase">✕</button>
+      </div>
+      <div class="case-detail" id="caseDetail">
+        <div class="case-d-img" id="caseDetailImg"></div>
+        <div class="case-d-info" id="caseDetailInfo"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-s" id="btnCloseCase2">关闭</button>
+        <button class="btn btn-p" id="btnCaseUse">✏️ 修改并生成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ AI Assist Modal ═══ -->
+  <div class="modal-bg" id="aiModal" style="display:none">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-h">
+        <h2>✨ AI 辅助写提示词</h2>
+        <button class="btn btn-s btn-sm" id="btnCloseAi">✕</button>
+      </div>
+      <div class="ai-body" id="aiBody">
+        <div class="ai-step" id="aiStep1">
+          <div class="ai-step-h">1. 选择分类</div>
+          <div class="ai-cats" id="aiCats"></div>
+        </div>
+        <div class="ai-step" id="aiStep2" style="display:none">
+          <div class="ai-step-h">2. 选择模板</div>
+          <div class="ai-tpls" id="aiTpls"></div>
+        </div>
+        <div class="ai-step" id="aiStep3" style="display:none">
+          <div class="ai-step-h">3. 已生成提示词</div>
+          <textarea class="ai-result" id="aiResult" rows="6" readonly></textarea>
+          <div class="ai-tips" id="aiTips"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-s" id="btnAiBack" style="display:none">← 返回</button>
+        <button class="btn btn-p" id="btnAiUse">✅ 使用此提示词</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ History Detail Modal ═══ -->
+  <div class="modal-bg" id="histModal" style="display:none">
+    <div class="modal modal-wide" style="max-width:820px;width:85%">
+      <div class="modal-h">
+        <h2>📜 历史详情</h2>
+        <button class="btn btn-s btn-sm" id="btnCloseHist">✕</button>
+      </div>
+      <div class="hist-detail" id="histDetail">
+        <div class="hist-d-img" id="histDetailImg"></div>
+        <div class="hist-d-info" id="histDetailInfo"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-s" id="btnCloseHist2">关闭</button>
+        <button class="btn btn-p" id="btnHistModify">✏️ 修改并生成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Lightbox ═══ -->
+  <div class="lb" id="lightbox" style="display:none">
+    <img src="" alt="预览" id="lbImg">
+  </div>
+
+  <script src="/js/app.js?v=6"></script>
+</body>
+</html>
