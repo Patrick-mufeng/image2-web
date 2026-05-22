@@ -7,7 +7,9 @@
   const $ = id => document.getElementById(id);
   const DOM = {
     statusDot: $('statusDot'), statusText: $('statusText'),
-    nav: $('nav'),
+    nav: $('nav'), balanceCard: $('balanceCard'),
+    balanceStatus: $('balanceStatus'), balanceToken: $('balanceToken'),
+    balanceUsage: $('balanceUsage'), balanceRemain: $('balanceRemain'),
     pageBaseUrl: $('pageBaseUrl'), pageApiKey: $('pageApiKey'),
     pageStatus: $('pageStatus'), pageSaveBtn: $('pageSaveBtn'),
     ratioGrid: $('ratioGrid'), resolutionSelect: $('resolutionSelect'),
@@ -107,9 +109,53 @@
     if (r.success) {
       S.userApiKey = k; S.userBaseUrl = u;
       S.apiConfigured = !!k;
+      S.apiKeyChanged = true;
       updStatus(); renderSettings();
       toast('设置已保存', 'success');
+      // 保存后自动查询余额
+      if (k) queryBalance();
     } else { toast('保存失败: ' + (r.error || '未知'), 'error'); }
+  });
+
+  // ── Balance Query ──
+  async function queryBalance() {
+    DOM.balanceCard.style.display = '';
+    DOM.balanceStatus.textContent = '查询中...';
+    DOM.balanceStatus.className = 'balance-status';
+    try {
+      const data = await api('GET', '/api/config/balance');
+      if (!data.configured) {
+        DOM.balanceStatus.textContent = '⏸ 未配置';
+        DOM.balanceStatus.className = 'balance-status';
+        DOM.balanceToken.textContent = '-';
+        DOM.balanceUsage.textContent = '-';
+        DOM.balanceRemain.textContent = '-';
+        return;
+      }
+      if (data.error) {
+        DOM.balanceStatus.textContent = '❌ ' + data.error;
+        DOM.balanceStatus.className = 'balance-status err';
+        return;
+      }
+      DOM.balanceStatus.textContent = '✅ 已更新';
+      DOM.balanceStatus.className = 'balance-status ok';
+      DOM.balanceToken.textContent = data.token_name || '-';
+      DOM.balanceUsage.textContent = '$' + (data.total_usage || 0);
+      DOM.balanceRemain.textContent = data.remaining || '-';
+    } catch(e) {
+      DOM.balanceStatus.textContent = '❌ 查询失败';
+      DOM.balanceStatus.className = 'balance-status err';
+    }
+  }
+
+  // Auto-query balance when switching to tab 0
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (tab === '0' && S.apiConfigured) {
+        queryBalance();
+      }
+    });
   });
 
   // ── Tab 1: Ratios ──
@@ -1279,5 +1325,10 @@
     });
 
     DOM.genBox.style.display='none';
+
+    // Auto-query balance on load if configured
+    if (S.apiConfigured) {
+      queryBalance();
+    }
   })();
 })();

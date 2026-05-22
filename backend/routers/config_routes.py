@@ -1,6 +1,8 @@
 """配置相关 API 路由"""
 
 import os
+import time
+import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 from backend.config import settings, save_settings_to_env
@@ -70,6 +72,71 @@ def resolve_size(ratio: str, megapixels: str) -> str:
 class SettingsUpdateRequest(BaseModel):
     api_key: str = ""
     base_url: str = ""
+
+
+@router.get("/config/balance")
+async def get_balance():
+    """查询 API Key 余额（调用 yunwu.ai 订阅和用量接口）"""
+    if not settings.yunwu_api_key or settings.yunwu_api_key == "sk-your-api-key-here":
+        return {"configured": False, "error": "API Key 未配置"}
+
+    base_url = settings.yunwu_base_url.rstrip("/")
+    headers = {
+        "Authorization": f"Bearer {settings.yunwu_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # 1. 查询订阅信息（令牌名、总额度）
+            sub_resp = await client.get(
+                f"{base_url}/v1/dashboard/billing/subscription",
+                headers=headers,
+            )
+            if sub_resp.status_code != 200:
+                return {"configured": True, "error": f"查询失败 ({sub_resp.status_code})"}
+
+            sub_data = sub_resp.json()
+            token_name = sub_data.get("token_name", "")
+            soft_limit = sub_data.get("soft_limit_usd", 0)
+
+            # 2. 查询本月用量
+            now = int(time.time())
+            # 当前月第一天
+            from datetime import datetime, timezone
+            dt = datetime.fromtimestamp(now, tz=timezone.utc)
+            month_start = int(datetime(dt.year, dt.month, 1, tzinfo=timezone.utc).timestamp())
+
+            usage_resp = await client.get(
+                f"{base_url}/v1/dashboard/billing/usage",
+                headers=headers,
+                params={"start": month_start, "end": now},
+            )
+
+            total_usage = 0
+            if usage_resp.status_code == 200:
+                usage_data = usage_resp.json()
+                total_usage = usage_data.get("total_usage", 0)
+
+            # 3. 合成结果
+            # soft_limit=100000000 表示不限量，显示实际用量
+            is_unlimited = soft_limit >= 99999999
+
+            return {
+                "configured": True,
+                "token_name": token_name,
+                "total_usage": round(total_usage, 4),
+                "soft_limit": soft_limit,
+                "is_unlimited": is_unlimited,
+                "remaining": "不限量" if is_unlimited else round(max(0, soft_limit - total_usage), 4),
+            }
+
+    except httpx.ConnectError:
+        return {"configured": True, "error": "无法连接到服务器，请检查 Base URL"}
+    except httpx.TimeoutException:
+        return {"configured": True, "error": "查询超时，请稍后重试"}
+    except Exception as e:
+        return {"configured": True, "error": f"查询异常: {str(e)[:100]}"}
 
 
 @router.get("/config/aspect-ratios")

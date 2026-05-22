@@ -175,6 +175,18 @@ body{
 .s-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
 .s-hint{font-size:.62rem;color:var(--text3);margin-top:3px}
 
+/* Balance Card */
+.balance-card{margin-top:12px}
+.balance-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:.85rem;font-weight:600}
+.balance-status{font-size:.68rem;font-weight:400;color:var(--text3)}
+.balance-status.ok{color:var(--green)}
+.balance-status.err{color:var(--red)}
+.balance-body{display:flex;flex-direction:column;gap:8px}
+.balance-row{display:flex;align-items:center;justify-content:space-between;font-size:.78rem;padding:4px 0;border-bottom:1px solid var(--bg2)}
+.balance-row:last-child{border-bottom:none}
+.balance-lbl{color:var(--text3)}
+.balance-val{font-weight:500;color:var(--text);font-family:var(--mono);font-size:.75rem}
+
 .bdg{
   display:inline-flex;align-items:center;gap:4px;
   padding:3px 14px;border-radius:20px;font-size:.75rem;font-weight:500
