@@ -24,6 +24,14 @@
     monReq: $('monReq'), monRes: $('monRes'), monResTag: $('monResTag'),
     tlProcess: $('tlProcess'), tlDone: $('tlDone'),
     toastWrap: $('toastWrap'), lightbox: $('lightbox'), lbImg: $('lbImg'),
+    // Image-to-image
+    btnModeTxt2Img: $('btnModeTxt2Img'), btnModeImg2Img: $('btnModeImg2Img'),
+    img2imgArea: $('img2imgArea'), uploadZone: $('uploadZone'),
+    fileInput: $('fileInput'), uploadPreviews: $('uploadPreviews'),
+    maskToggle: $('maskToggle'), maskMode: $('maskMode'),
+    maskUpload: $('maskUpload'), maskInput: $('maskInput'),
+    btnMaskBrowse: $('btnMaskBrowse'), maskName: $('maskName'),
+    btnGenLabel: $('btnGenLabel'), btnBrowse: $('btnBrowse'),
   };
 
   const S = {
@@ -32,6 +40,9 @@
     numOutputs: 1, prompt: '', models: [],
     apiConfigured: false, userApiKey: '', userBaseUrl: '',
     isGenerating: false, multiMode: false,
+    mode: 'txt2img',  // 'txt2img' | 'img2img'
+    uploadedFiles: [], // [{file, dataUrl}]
+    maskFile: null,
     historyPage: 1, historyLimit: 12, historyTotal: 0, historyRecords: [],
   };
 
@@ -146,7 +157,136 @@
     const lines = getPrompts();
     DOM.multiHint.textContent = (lines && lines.length > 1) ? lines.length + ' 个' : '每行各一张';
   }
-  function updBtn() { DOM.btnGenerate.disabled = !S.prompt.trim() || S.isGenerating; }
+  function updBtn() {
+    if (S.mode === 'img2img') {
+      DOM.btnGenerate.disabled = !S.prompt.trim() || S.isGenerating || !S.uploadedFiles.length;
+    } else {
+      DOM.btnGenerate.disabled = !S.prompt.trim() || S.isGenerating;
+    }
+  }
+
+  // ── Tab 1: Mode Toggle ──
+  function switchMode(mode) {
+    S.mode = mode;
+    document.querySelectorAll('.gm-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    DOM.img2imgArea.style.display = mode === 'img2img' ? '' : 'none';
+    DOM.btnGenLabel.textContent = mode === 'img2img' ? '图生图' : '生成';
+
+    // Disable multi-mode in img2img
+    if (mode === 'img2img') {
+      DOM.multiMode.checked = false;
+      S.multiMode = false;
+      DOM.multiMode.disabled = true;
+    } else {
+      DOM.multiMode.disabled = false;
+    }
+    updBtn();
+  }
+
+  if (DOM.btnModeTxt2Img) {
+    DOM.btnModeTxt2Img.addEventListener('click', () => switchMode('txt2img'));
+  }
+  if (DOM.btnModeImg2Img) {
+    DOM.btnModeImg2Img.addEventListener('click', () => switchMode('img2img'));
+  }
+
+  // ── Tab 1: Image Upload ──
+  function handleFiles(files) {
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    const maxSize = 50 * 1024 * 1024; // 50MB total
+
+    let added = 0;
+    for (const file of files) {
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(png|jpe?g|webp)$/i)) continue;
+      if (S.uploadedFiles.length >= 16) {
+        toast('最多 16 张图片', 'error');
+        break;
+      }
+      // Check total size
+      const totalSize = S.uploadedFiles.reduce((s, f) => s + f.file.size, 0) + file.size;
+      if (totalSize > maxSize) {
+        toast('图片总大小超过 50MB', 'error');
+        break;
+      }
+      S.uploadedFiles.push({ file, dataUrl: URL.createObjectURL(file) });
+      added++;
+    }
+    if (added) {
+      renderPreviews();
+      updBtn();
+      toast('已添加 ' + added + ' 张图片', 'success');
+    }
+  }
+
+  function removeFile(index) {
+    const item = S.uploadedFiles[index];
+    if (item && item.dataUrl) URL.revokeObjectURL(item.dataUrl);
+    S.uploadedFiles.splice(index, 1);
+    renderPreviews();
+    updBtn();
+  }
+
+  function renderPreviews() {
+    DOM.uploadPreviews.innerHTML = '';
+    if (!S.uploadedFiles.length) {
+      DOM.uploadPreviews.style.display = 'none';
+      return;
+    }
+    DOM.uploadPreviews.style.display = 'flex';
+    S.uploadedFiles.forEach((item, i) => {
+      const div = document.createElement('div');
+      div.className = 'up-item';
+      div.innerHTML = '<img src="' + item.dataUrl + '" alt=""><button class="up-del" data-i="' + i + '">✕</button>';
+      div.querySelector('.up-del').addEventListener('click', () => removeFile(i));
+      DOM.uploadPreviews.appendChild(div);
+    });
+  }
+
+  // Drag & Drop
+  if (DOM.uploadZone) {
+    DOM.uploadZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      DOM.uploadZone.classList.add('drag-over');
+    });
+    DOM.uploadZone.addEventListener('dragleave', () => {
+      DOM.uploadZone.classList.remove('drag-over');
+    });
+    DOM.uploadZone.addEventListener('drop', e => {
+      e.preventDefault();
+      DOM.uploadZone.classList.remove('drag-over');
+      if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    });
+  }
+
+  // Browse button
+  if (DOM.btnBrowse) {
+    DOM.btnBrowse.addEventListener('click', () => DOM.fileInput.click());
+  }
+  if (DOM.fileInput) {
+    DOM.fileInput.addEventListener('change', () => {
+      if (DOM.fileInput.files.length) handleFiles(DOM.fileInput.files);
+      DOM.fileInput.value = '';
+    });
+  }
+
+  // Mask toggle
+  if (DOM.maskMode) {
+    DOM.maskMode.addEventListener('change', () => {
+      DOM.maskUpload.style.display = DOM.maskMode.checked ? '' : 'none';
+      if (!DOM.maskMode.checked) { S.maskFile = null; DOM.maskName.textContent = '未选择'; }
+    });
+  }
+  if (DOM.btnMaskBrowse) {
+    DOM.btnMaskBrowse.addEventListener('click', () => DOM.maskInput.click());
+  }
+  if (DOM.maskInput) {
+    DOM.maskInput.addEventListener('change', () => {
+      if (DOM.maskInput.files.length) {
+        S.maskFile = DOM.maskInput.files[0];
+        DOM.maskName.textContent = S.maskFile.name;
+      }
+    });
+  }
 
   // ── Tab 1: Log ──
   function log(text, cls) {
@@ -213,9 +353,21 @@
     return {images:[],error:resp.error};
   }
 
+  async function apiFormData(url, formData) {
+    try {
+      const r = await fetch(url, { method: 'POST', body: formData });
+      return await r.json();
+    } catch(e) { return { success: false, error: '网络错误: ' + e.message }; }
+  }
+
   async function generateImage() {
     if (!S.prompt.trim() || S.isGenerating) return;
     if (!S.apiConfigured) { toast('请先配置 API Key','error'); switchTab(0); return; }
+
+    // Image-to-image mode
+    if (S.mode === 'img2img') {
+      return await generateEdit();
+    }
 
     const prompts = S.multiMode ? getPrompts() : null;
     const isMulti = prompts && prompts.length > 1;
@@ -283,6 +435,105 @@
 
       log('📡 实时跟踪...','hl'); DOM.genBadge.textContent='⏳ 处理中'; startPoll(t0);
     } catch(e) { log('❌ '+e.message,'err'); toast('异常: '+e.message,'error'); finalizeMonitor(false); finishGen(); }
+  }
+
+  // ── Image-to-Image ──
+  function getEditSize() {
+    // Map ratio+megapixels to size string (same as backend)
+    const map = {
+      '1:1_1': '1024x1024', '1:1_2': '2048x2048', '1:1_4': '4096x4096',
+      '16:9_1': '1280x720', '16:9_2': '2560x1440', '16:9_4': '3840x2160',
+      '9:16_1': '720x1280', '9:16_2': '1440x2560', '9:16_4': '2160x3840',
+      '4:3_1': '1152x864', '4:3_2': '2048x1536', '4:3_4': '4096x3072',
+      '3:4_1': '864x1152', '3:4_2': '1536x2048', '3:4_4': '3072x4096',
+    };
+    return map[S.aspectRatio + '_' + S.megapixels] || '1024x1024';
+  }
+
+  async function generateEdit() {
+    if (!S.prompt.trim() || S.isGenerating || !S.uploadedFiles.length) return;
+    if (!S.apiConfigured) { toast('请先配置 API Key','error'); switchTab(0); return; }
+
+    S.isGenerating = true; stopPoll();
+    DOM.btnGenerate.style.display='none'; DOM.btnCancel.style.display='inline-flex';
+    DOM.emptyState.style.display='none'; DOM.genBox.style.display='';
+    DOM.resultsWrap.classList.remove('show'); DOM.genLog.innerHTML='';
+    DOM.genBar.className='g-fill idet'; DOM.genBadge.textContent='上传中'; DOM.genBadge.className='g-bdg';
+    updBtn();
+    DOM.monEmpty.style.display='none'; DOM.monBody.style.display='flex';
+    DOM.monReq.textContent='等待请求…'; DOM.monRes.textContent='等待响应…';
+    DOM.btnRetry.style.display = 'none';
+    DOM.btnDownloadAll.style.display = 'none';
+
+    const editSize = getEditSize();
+    log('🖼️ 开始图生图编辑','hl');
+    log(S.model + ' · ' + editSize + ' · ' + S.uploadedFiles.length + ' 张图片','l');
+    S.lastPrompt = S.prompt;
+    const t0 = Date.now();
+    switchTab(1);
+
+    try {
+      // Build FormData
+      const formData = new FormData();
+      formData.append('prompt', S.prompt);
+      formData.append('model', S.model);
+      formData.append('size', editSize);
+      formData.append('n', String(S.numOutputs));
+      formData.append('quality', 'auto');
+      formData.append('background', 'auto');
+      for (const item of S.uploadedFiles) {
+        formData.append('images', item.file);
+      }
+      if (S.maskFile) {
+        formData.append('mask', S.maskFile);
+      }
+
+      log('📤 上传 ' + S.uploadedFiles.length + ' 张图片...','l');
+      DOM.genBadge.textContent='上传中';
+
+      // Update monitor with request preview
+      const reqPreview = { prompt: S.prompt.slice(0,80), model: S.model, size: editSize, n: S.numOutputs, images: S.uploadedFiles.length };
+      DOM.monReq.textContent = JSON.stringify(reqPreview, null, 2);
+      DOM.monRes.textContent = '等待响应…';
+      DOM.monLive.className = 'mon-live active';
+      DOM.monResTag.className = 'mon-tag pending';
+      DOM.monResTag.textContent = '⏳ 处理中';
+
+      const resp = await apiFormData('/api/edits', formData);
+
+      // Update monitor with response
+      DOM.monRes.textContent = JSON.stringify(resp.response_data || resp, null, 2);
+      DOM.monResTag.textContent = resp.success ? '✅ 完成' : '❌ 失败';
+      DOM.monLive.className = 'mon-live';
+      DOM.monLive.innerHTML = resp.success ? '● 请求完成' : '● 请求失败';
+      document.querySelectorAll('.tl-i').forEach(t => t.classList.add('done'));
+
+      if (resp.logs) resp.logs.split('\n').filter(Boolean).forEach(l => log(l, 'l'));
+
+      if (resp.success && resp.images && resp.images.length) {
+        DOM.genBadge.textContent = '✅ 完成';
+        DOM.genBadge.className = 'g-bdg done';
+        DOM.genBar.className = 'g-fill';
+        DOM.genBar.style.width = '100%';
+        const sec = ((Date.now()-t0)/1000).toFixed(1);
+        log('✅ 成功! ' + sec + 's', 'ok');
+        renderImgs(resp.images);
+        toast('生成 ' + resp.images.length + ' 张', 'success');
+        DOM.btnDownloadAll.style.display = 'inline-flex';
+        S.historyPage = 1; loadHistory();
+      } else {
+        DOM.genBadge.textContent = '❌ 失败';
+        DOM.genBadge.className = 'g-bdg fail';
+        log('❌ ' + (resp.error || '失败'), 'err');
+        toast(resp.error || '图生图失败', 'error');
+        DOM.btnRetry.style.display = 'inline-flex';
+      }
+    } catch(e) {
+      log('❌ ' + e.message, 'err');
+      toast('异常: ' + e.message, 'error');
+    } finally {
+      finishGen();
+    }
   }
 
   function startPoll(t0) {

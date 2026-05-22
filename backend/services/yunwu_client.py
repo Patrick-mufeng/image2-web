@@ -128,5 +128,77 @@ class YunwuClient:
             await asyncio.sleep(poll_interval)
 
 
+    # ── OpenAI 格式：图生图编辑 ────────────────────────────────────
+
+    async def edit_image(self, image_data: bytes, prompt: str,
+                          filename: str = "image.png",
+                          model: str = "gpt-image-2",
+                          mask_data: bytes | None = None,
+                          mask_filename: str = "mask.png",
+                          n: int = 1,
+                          size: str = "1024x1024",
+                          quality: str = "auto",
+                          background: str = "auto") -> dict:
+        """调用 OpenAI 兼容的 /v1/images/edits 接口（multipart 上传）"""
+        base_url = settings.yunwu_base_url.rstrip("/")
+        url = f"{base_url}/v1/images/edits"
+
+        files = {
+            "image": (filename, image_data, "image/png"),
+            "prompt": (None, prompt),
+            "model": (None, model),
+            "n": (None, str(n)),
+            "size": (None, size),
+            "quality": (None, quality),
+            "background": (None, background),
+        }
+
+        if mask_data:
+            files["mask"] = (mask_filename, mask_data, "image/png")
+
+        headers = {
+            "Authorization": f"Bearer {settings.yunwu_api_key}",
+            "Accept": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(url, headers=headers, files=files)
+
+            if resp.status_code != 200:
+                raise YunwuAPIError(
+                    f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}"
+                )
+
+            return resp.json()
+
+    # ── OpenAI 格式：多图参考生成 (gpt-image-2-all) ──────────────
+
+    async def reference_generate(self, prompt: str, image_urls: list[str],
+                                  model: str = "gpt-image-2-all",
+                                  size: str = "1024x1024", n: int = 1) -> dict:
+        """调用 gpt-image-2-all 多图参考生成接口"""
+        base_url = settings.yunwu_base_url.rstrip("/")
+
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "n": n,
+            "size": size,
+            "image": image_urls,
+        }
+
+        url = f"{base_url}/v1/images/generations"
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.post(url, headers=self._headers(), json=payload)
+
+            if resp.status_code != 200:
+                raise YunwuAPIError(
+                    f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}"
+                )
+
+            return resp.json()
+
+
 # 全局单例
 yunwu_client = YunwuClient()

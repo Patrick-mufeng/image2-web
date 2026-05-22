@@ -123,6 +123,12 @@
         <!-- ═══ TAB 1: Image Generation ═══ -->
         <section class="tab-pane" id="tab1">
           <div class="page page-gen">
+            <!-- Mode Toggle -->
+            <div class="gen-mode">
+              <button class="gm-btn active" data-mode="txt2img" id="btnModeTxt2Img">🖊️ 文生图</button>
+              <button class="gm-btn" data-mode="img2img" id="btnModeImg2Img">🖼️ 图生图</button>
+            </div>
+
             <!-- Control Bar -->
             <div class="ctl">
               <div class="ctl-g">
@@ -162,6 +168,29 @@
             <div class="gen-split">
               <!-- Left: Prompt -->
               <div class="gen-left">
+                <!-- Image Upload Area (图生图) -->
+                <div class="img2img-area" id="img2imgArea" style="display:none">
+                  <div class="upload-zone" id="uploadZone">
+                    <div class="uz-icon">📸</div>
+                    <div class="uz-text">拖拽图片到这里，或<span class="uz-link" id="btnBrowse">点击选择</span></div>
+                    <div class="uz-hint">支持 JPG / PNG / WebP，最多 16 张，共 50MB</div>
+                    <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+                  </div>
+                  <div class="upload-previews" id="uploadPreviews"></div>
+                  <div class="mask-toggle" id="maskToggle">
+                    <label class="tog">
+                      <input type="checkbox" id="maskMode">
+                      <span class="tog-track"></span>
+                      <span class="tog-lbl">使用蒙版 <span class="tog-ht">（可选，PNG）</span></span>
+                    </label>
+                  </div>
+                  <div class="mask-upload" id="maskUpload" style="display:none">
+                    <input type="file" id="maskInput" accept="image/png" style="display:none">
+                    <button class="btn btn-s" id="btnMaskBrowse">🎭 上传蒙版</button>
+                    <span class="mask-name" id="maskName">未选择</span>
+                  </div>
+                </div>
+
                 <div class="prompt-area">
                   <textarea id="promptInput" placeholder="描述你想要生成的图片…" maxlength="4000"></textarea>
                   <div class="prompt-foot">
@@ -176,7 +205,7 @@
                 <div class="prompt-acts">
                   <button class="btn gen-btn" id="btnGenerate" disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    生成
+                    <span id="btnGenLabel">生成</span>
                   </button>
                   <button class="btn btn-s" id="btnCancel" style="display:none">取消</button>
                 </div>

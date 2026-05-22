@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
-from backend.routers import generation, history, config_routes, templates, cases, metadata
+from backend.routers import generation, history, config_routes, templates, cases, metadata, edits
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(config_routes.router, prefix="/api", tags=["配置"])
 app.include_router(templates.router, prefix="/api", tags=["模板"])
 app.include_router(cases.router, prefix="/api", tags=["案例"])
 app.include_router(metadata.router, prefix="/api", tags=["元数据"])
+app.include_router(edits.router, prefix="/api", tags=["图生图"])
 
 # 静态文件：生成的图片
 os.makedirs(settings.image_save_dir, exist_ok=True)
