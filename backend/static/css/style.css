@@ -60,6 +60,12 @@ body{
 }
 .hdr-title{font-size:.92rem;font-weight:600;letter-spacing:-.01em;color:var(--text)}
 .hdr-title em{font-style:normal;color:var(--accent)}
+.hdr-eng{
+  font-size:.62rem;font-weight:400;
+  color:var(--accent);opacity:.7;
+  letter-spacing:.08em;margin-left:2px;
+  font-style:italic;text-transform:lowercase
+}
 .hdr-r{display:flex;align-items:center;gap:4px}
 .hdr-status{
   display:flex;align-items:center;gap:4px;
