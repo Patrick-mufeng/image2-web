@@ -7,6 +7,10 @@ python/
 # 用户数据（图片、历史记录、日志）
 data/
 
+# 产品展示素材（不进仓库）
+product-showcase/
+image/
+
 # Python
 __pycache__/
 *.pyc
