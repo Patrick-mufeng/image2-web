@@ -1,12 +1,6 @@
 # 环境配置（含 API Key）
 .env
 
-# 嵌入式 Python 运行环境（可重新生成）
-python/
-
-# 案例图片（体积大，单独下载）
-data/case_images/
-
 # 用户生成数据（不跟踪）
 data/history.json
 data/request_logs.json
