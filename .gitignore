@@ -4,8 +4,14 @@
 # 嵌入式 Python 运行环境（可重新生成）
 python/
 
-# 用户数据（图片、历史记录、日志）
-data/
+# 案例图片（体积大，单独下载）
+data/case_images/
+
+# 用户生成数据（不跟踪）
+data/history.json
+data/request_logs.json
+data/images/
+data/meta_images/
 
 # 产品展示素材（不进仓库）
 product-showcase/
