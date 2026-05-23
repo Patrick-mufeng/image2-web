@@ -11,15 +11,18 @@ router = APIRouter()
 @router.get("/cases")
 async def list_cases(
     category: str = None,
+    language: str = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     search: str = None,
 ):
-    """获取案例列表（分页 + 分类过滤）"""
+    """获取案例列表（分页 + 分类 + 语言过滤）"""
     cases = load_cases()
 
     if category:
         cases = [c for c in cases if c.get("category") == category]
+    if language:
+        cases = [c for c in cases if c.get("language") == language]
     if search:
         sl = search.lower()
         cases = [c for c in cases if sl in (c.get("title", "") + c.get("prompt", "")).lower()]
@@ -42,14 +45,24 @@ async def list_cases(
 
 @router.get("/cases/categories")
 async def list_case_categories():
-    """获取案例的分类及数量"""
+    """获取案例的分类及数量（含语言统计）"""
     cases = load_cases()
     counts = {}
+    lang_counts = {"zh": 0, "en": 0}
     for c in cases:
         cat = c.get("category", "其他")
         counts[cat] = counts.get(cat, 0) + 1
+        lang = c.get("language", "en")
+        if lang in lang_counts:
+            lang_counts[lang] += 1
     sorted_cats = sorted(counts.items(), key=lambda x: -x[1])
-    return {"categories": [{"name": k, "count": v} for k, v in sorted_cats]}
+    return {
+        "categories": [{"name": k, "count": v} for k, v in sorted_cats],
+        "languages": [
+            {"name": "中文提示词", "value": "zh", "count": lang_counts["zh"]},
+            {"name": "English", "value": "en", "count": lang_counts["en"]},
+        ],
+    }
 
 
 @router.get("/case-images/{filename}")

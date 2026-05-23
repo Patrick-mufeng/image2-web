@@ -482,6 +482,9 @@ body{
 }
 .cf-btn:hover{background:var(--bg3);color:var(--text)}
 .cf-btn.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.cf-sep{color:var(--border);font-size:.7rem;padding:0 4px;user-select:none}
+.cf-btn.lang{background:var(--accent-soft);color:var(--accent)}
+.cf-btn.lang.active{background:var(--accent);color:#fff}
 .case-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px
 }

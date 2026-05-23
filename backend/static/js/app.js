@@ -981,25 +981,29 @@
   const caseCount = document.getElementById('caseCount');
   const caseEmpty = document.getElementById('caseEmpty');
   const casePages = document.getElementById('casePages');
-  let S2 = { page: 1, limit: 18, total: 0, category: '', cases: [], categories: [] };
+  let S2 = { page: 1, limit: 18, total: 0, category: '', language: '', cases: [], categories: [], languages: [] };
 
   async function loadCases() {
     caseGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text3)">加载案例中…</div>';
     try {
+      const catParam = S2.category ? '&category=' + encodeURIComponent(S2.category) : '';
+      const langParam = S2.language ? '&language=' + S2.language : '';
       const [listRes, catRes] = await Promise.all([
-        api('GET', '/api/cases?page=' + S2.page + '&limit=' + S2.limit + (S2.category ? '&category=' + encodeURIComponent(S2.category) : '')),
+        api('GET', '/api/cases?page=' + S2.page + '&limit=' + S2.limit + catParam + langParam),
         S2.categories.length ? Promise.resolve({ categories: S2.categories }) : api('GET', '/api/cases/categories'),
       ]);
       S2.total = listRes.total || 0;
       S2.cases = listRes.cases || [];
       S2.categories = catRes.categories || S2.categories;
+      S2.languages = catRes.languages || [];
       renderCaseFilter();
       renderCases();
     } catch(e) { caseGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text3)">加载失败</div>'; }
   }
 
   function renderCaseFilter() {
-    caseFilter.innerHTML = '<button class="cf-btn' + (!S2.category ? ' active' : '') + '" data-cat="">全部</button>';
+    caseFilter.innerHTML = '<button class="cf-btn' + (!S2.category && !S2.language ? ' active' : '') + '" data-cat="">全部</button>';
+    // Category buttons
     S2.categories.forEach(c => {
       const btn = document.createElement('button');
       btn.className = 'cf-btn' + (c.name === S2.category ? ' active' : '');
@@ -1007,6 +1011,26 @@
       btn.textContent = c.name + ' (' + c.count + ')';
       btn.addEventListener('click', () => {
         S2.category = c.name;
+        S2.language = '';
+        S2.page = 1;
+        loadCases();
+      });
+      caseFilter.appendChild(btn);
+    });
+    // Language separator
+    const sep = document.createElement('span');
+    sep.className = 'cf-sep';
+    sep.textContent = '|';
+    caseFilter.appendChild(sep);
+    // Language filter buttons
+    S2.languages.forEach(l => {
+      const btn = document.createElement('button');
+      btn.className = 'cf-btn lang' + (l.value === S2.language ? ' active' : '');
+      btn.dataset.lang = l.value;
+      btn.textContent = l.name + ' (' + l.count + ')';
+      btn.addEventListener('click', () => {
+        S2.language = l.value;
+        S2.category = '';
         S2.page = 1;
         loadCases();
       });
@@ -1015,6 +1039,7 @@
     // Reset handler for "全部"
     caseFilter.firstChild.addEventListener('click', () => {
       S2.category = '';
+      S2.language = '';
       S2.page = 1;
       loadCases();
     });
