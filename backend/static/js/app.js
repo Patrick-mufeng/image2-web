@@ -988,13 +988,13 @@
     try {
       const catParam = S2.category ? '&category=' + encodeURIComponent(S2.category) : '';
       const langParam = S2.language ? '&language=' + S2.language : '';
-      const [listRes, catRes] = await Promise.all([
-        api('GET', '/api/cases?page=' + S2.page + '&limit=' + S2.limit + catParam + langParam),
-        S2.categories.length ? Promise.resolve({ categories: S2.categories }) : api('GET', '/api/cases/categories'),
-      ]);
+      const listPromise = api('GET', '/api/cases?page=' + S2.page + '&limit=' + S2.limit + catParam + langParam);
+      // Always fetch categories/languages (don't cache to avoid stale data)
+      const catPromise = api('GET', '/api/cases/categories');
+      const [listRes, catRes] = await Promise.all([listPromise, catPromise]);
       S2.total = listRes.total || 0;
       S2.cases = listRes.cases || [];
-      S2.categories = catRes.categories || S2.categories;
+      S2.categories = catRes.categories || [];
       S2.languages = catRes.languages || [];
       renderCaseFilter();
       renderCases();
@@ -1339,13 +1339,13 @@
     // Load templates
     await loadTemplates();
 
-    // Preload cases on first nav to tab 3
+    // Load cases when navigating to tab 3
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
       if (item.dataset.tab === '3') {
         item.addEventListener('click', () => {
-          if (!S2.categories.length) loadCases();
-        }, { once: true });
+          loadCases();
+        });
       }
     });
 
