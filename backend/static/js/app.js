@@ -1195,13 +1195,20 @@
 
   // PS Presets
   const metaPreset = document.getElementById('metaPreset');
-  api('GET', '/api/metadata/presets').then(r => {
-    (r.presets || []).forEach(p => {
+  function renderMetaPresets(presets) {
+    const currentVal = metaPreset.value;
+    metaPreset.innerHTML = '<option value="">选择预设...</option>';
+    (presets || []).forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
-      opt.textContent = p.label + ' — ' + p.desc;
+      const suffix = p.user ? ' 💿' : '';
+      opt.textContent = p.label + suffix + ' — ' + (p.desc || '');
       metaPreset.appendChild(opt);
     });
+    if (currentVal) metaPreset.value = currentVal;
+  }
+  api('GET', '/api/metadata/presets').then(r => {
+    renderMetaPresets(r.presets || []);
   });
   metaPreset.addEventListener('change', () => {
     const p = metaPreset.value;
@@ -1323,6 +1330,35 @@
         toast('批量处理完成', 'success');
       }
     } catch(e) { logBatch('❌ ' + e.message); toast('批量处理失败', 'error'); }
+  });
+
+  // Save Preset button
+  document.getElementById('btnMetaSavePreset').addEventListener('click', async () => {
+    const label = prompt('请输入预设名称：');
+    if (!label || !label.trim()) return;
+    const data = {
+      artist: document.getElementById('metaArtist').value,
+      copyright: document.getElementById('metaCopyright').value,
+      description: document.getElementById('metaDescription').value,
+      software: document.getElementById('metaSoftware').value,
+    };
+    try {
+      const r = await fetch('/api/metadata/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: label.trim(), desc: '', data }),
+      });
+      const resp = await r.json();
+      if (resp.success) {
+        toast('预设已保存: ' + label, 'success');
+        // Refresh preset list
+        const pr = await fetch('/api/metadata/presets');
+        const pd = await pr.json();
+        renderMetaPresets(pd.presets || []);
+      } else {
+        toast(resp.error || '保存失败', 'error');
+      }
+    } catch(e) { toast('保存失败: ' + e.message, 'error'); }
   });
 
   // ── Init ──

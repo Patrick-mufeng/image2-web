@@ -191,5 +191,80 @@ def write_metadata(filepath: str, meta: dict, output_path: str = None) -> str:
 
 
 def get_presets() -> list:
-    """获取 PS 预设列表"""
-    return PS_PRESETS
+    """获取 PS 预设列表（内置 + 用户自定义）"""
+    presets = list(PS_PRESETS)
+
+    # 加载用户自定义预设
+    user_file = os.path.join(DATA_DIR, "user_presets.json")
+    if os.path.exists(user_file):
+        try:
+            with open(user_file, "r", encoding="utf-8") as f:
+                user_presets = json.load(f)
+                if isinstance(user_presets, list):
+                    # 标记为用户预设
+                    for p in user_presets:
+                        p["user"] = True
+                    presets.extend(user_presets)
+        except Exception:
+            pass
+
+    return presets
+
+
+def save_user_preset(label: str, desc: str, data: dict) -> dict:
+    """保存用户自定义预设"""
+    user_file = os.path.join(DATA_DIR, "user_presets.json")
+
+    # 读取已有预设
+    user_presets = []
+    if os.path.exists(user_file):
+        try:
+            with open(user_file, "r", encoding="utf-8") as f:
+                user_presets = json.load(f)
+        except Exception:
+            user_presets = []
+
+    # 生成 ID
+    import hashlib, time
+    raw = f"{label}_{time.time()}"
+    preset_id = "user_" + hashlib.md5(raw.encode()).hexdigest()[:8]
+
+    new_preset = {
+        "id": preset_id,
+        "label": label,
+        "desc": desc,
+        "data": data,
+        "user": True,
+        "created_at": time.strftime("%Y-%m-%d %H:%M"),
+    }
+
+    # 去重：同 label 覆盖
+    user_presets = [p for p in user_presets if p.get("label") != label]
+    user_presets.append(new_preset)
+
+    with open(user_file, "w", encoding="utf-8") as f:
+        json.dump(user_presets, f, ensure_ascii=False, indent=2)
+
+    return new_preset
+
+
+def delete_user_preset(preset_id: str) -> bool:
+    """删除用户自定义预设"""
+    user_file = os.path.join(DATA_DIR, "user_presets.json")
+    if not os.path.exists(user_file):
+        return False
+
+    try:
+        with open(user_file, "r", encoding="utf-8") as f:
+            user_presets = json.load(f)
+    except Exception:
+        return False
+
+    before = len(user_presets)
+    user_presets = [p for p in user_presets if p.get("id") != preset_id]
+    if len(user_presets) == before:
+        return False
+
+    with open(user_file, "w", encoding="utf-8") as f:
+        json.dump(user_presets, f, ensure_ascii=False, indent=2)
+    return True

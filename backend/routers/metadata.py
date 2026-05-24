@@ -4,10 +4,13 @@ import os
 import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from backend.services.metadata_service import (
     read_metadata,
     write_metadata,
     get_presets,
+    save_user_preset,
+    delete_user_preset,
     META_IMAGES_DIR,
 )
 
@@ -18,8 +21,30 @@ ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".tif"}
 
 @router.get("/metadata/presets")
 async def list_presets():
-    """获取 PS 预设列表"""
+    """获取 PS 预设列表（内置 + 用户自定义）"""
     return {"presets": get_presets()}
+
+
+class SavePresetRequest(BaseModel):
+    label: str
+    desc: str = ""
+    data: dict
+
+
+@router.post("/metadata/presets")
+async def save_preset(req: SavePresetRequest):
+    """保存用户自定义预设"""
+    if not req.label.strip():
+        return {"success": False, "error": "预设名称不能为空"}
+    preset = save_user_preset(req.label.strip(), req.desc, req.data)
+    return {"success": True, "preset": preset}
+
+
+@router.delete("/metadata/presets/{preset_id}")
+async def delete_preset(preset_id: str):
+    """删除用户自定义预设"""
+    ok = delete_user_preset(preset_id)
+    return {"success": ok}
 
 
 @router.post("/metadata/read")
@@ -101,8 +126,12 @@ async def batch_write_metadata(
     zip_path = os.path.join(META_IMAGES_DIR, f"batch_{uuid.uuid4().hex}.zip")
     with zipfile.ZipFile(zip_path, "w") as zf:
         for r in results:
-            if r["status"] == "ok" and os.path.exists(os.path.join(batch_dir, r["output"])):
-                zf.write(os.path.join(batch_dir, r["output"]), r["output"])
+            if r["status"] == "ok":
+                out_file = os.path.join(batch_dir, r["output"])
+                if not os.path.exists(out_file):
+                    out_file = os.path.join(META_IMAGES_DIR, r["output"])
+                if os.path.exists(out_file):
+                    zf.write(out_file, r["output"])
 
     # 清理
     shutil.rmtree(batch_dir, ignore_errors=True)
