@@ -19,58 +19,14 @@ from backend.services.yunwu_client import yunwu_client, YunwuAPIError
 from backend.services.log_store import log_store
 from backend.services.history_store import history_store
 from backend.services.task_manager import task_manager
+from backend.services.image_utils import download_image, save_base64_image
 from backend.routers.config_routes import is_replicate_model, resolve_size
 
 router = APIRouter()
 
 
-async def download_image(url: str, task_id: str, index: int) -> str:
-    """从 URL 下载图片到本地存储"""
-    import httpx
-    save_dir = settings.image_save_dir
-    os.makedirs(save_dir, exist_ok=True)
-
-    ext = url.split(".")[-1].split("?")[0] or "jpg"
-    filename = f"{task_id}_{index}.{ext}"
-    filepath = os.path.join(save_dir, filename)
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            with open(filepath, "wb") as f:
-                f.write(resp.content)
-            return f"/api/images/{filename}"
-        except Exception as e:
-            print(f"下载图片失败 {url}: {e}")
-            return ""
-
-
-async def save_base64_image(b64_json: str, task_id: str, index: int) -> str:
-    """保存 base64 编码的图片到本地"""
-    import base64
-    save_dir = settings.image_save_dir
-    os.makedirs(save_dir, exist_ok=True)
-
-    filename = f"{task_id}_{index}.png"
-    filepath = os.path.join(save_dir, filename)
-
-    try:
-        raw = base64.b64decode(b64_json)
-        with open(filepath, "wb") as f:
-            f.write(raw)
-        return f"/api/images/{filename}"
-    except Exception as e:
-        print(f"保存 base64 图片失败: {e}")
-        return ""
-
-
 def ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
-
-
-def ms() -> str:
-    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 
 @router.post("/generate")
@@ -206,26 +162,34 @@ async def generate_image(request: GenerateRequest):
                     logs += f"[{ts()}] 📥 下载图片 {idx+1}/{len(data_items)}...\n"
                     task_manager.append_log(task_id, f"[{ts()}] 📥 下载图片 {idx+1}/{len(data_items)}...")
                     local_path = await download_image(item["url"], task_id, idx)
-                    images.append(ImageInfo(
-                        url=item["url"], local_path=local_path,
-                        revised_prompt=item.get("revised_prompt", ""),
-                    ))
-                    history_images.append({
-                        "url": item["url"], "local_path": local_path,
-                        "revised_prompt": item.get("revised_prompt", ""),
-                    })
+                    if local_path:
+                        images.append(ImageInfo(
+                            url=item["url"], local_path=local_path,
+                            revised_prompt=item.get("revised_prompt", ""),
+                        ))
+                        history_images.append({
+                            "url": item["url"], "local_path": local_path,
+                            "revised_prompt": item.get("revised_prompt", ""),
+                        })
+                    else:
+                        logs += f"[{ts()}] ⚠️ 图片 {idx+1} 下载失败，跳过\n"
+                        task_manager.append_log(task_id, f"[{ts()}] ⚠️ 图片 {idx+1} 下载失败，跳过")
                 elif item.get("b64_json"):
                     logs += f"[{ts()}] 💾 保存 base64 图片 {idx+1}/{len(data_items)}...\n"
                     task_manager.append_log(task_id, f"[{ts()}] 💾 解码 base64 图片 {idx+1}/{len(data_items)}...")
                     local_path = await save_base64_image(item["b64_json"], task_id, idx)
-                    images.append(ImageInfo(
-                        local_path=local_path,
-                        revised_prompt=item.get("revised_prompt", ""),
-                    ))
-                    history_images.append({
-                        "local_path": local_path,
-                        "revised_prompt": item.get("revised_prompt", ""),
-                    })
+                    if local_path:
+                        images.append(ImageInfo(
+                            local_path=local_path,
+                            revised_prompt=item.get("revised_prompt", ""),
+                        ))
+                        history_images.append({
+                            "local_path": local_path,
+                            "revised_prompt": item.get("revised_prompt", ""),
+                        })
+                    else:
+                        logs += f"[{ts()}] ⚠️ 图片 {idx+1} base64 解码失败，跳过\n"
+                        task_manager.append_log(task_id, f"[{ts()}] ⚠️ 图片 {idx+1} base64 解码失败，跳过")
 
             t_dl_end = time.time()
             download_duration = round(t_dl_end - t_dl_start, 1)
@@ -233,8 +197,12 @@ async def generate_image(request: GenerateRequest):
                 monitor_steps.append({"step": "图片下载/保存", "time": ts(), "elapsed": round(t_dl_end - t0, 2), "download_duration": download_duration})
 
             elapsed = time.time() - t0
-            logs += f"[{ts()}] ✅ 完成! 耗时: {elapsed:.1f}s (API: {api_duration}s, 下载: {download_duration}s)\n"
-            monitor_steps.append({"step": "完成", "time": ts(), "elapsed": round(elapsed, 1), "total": round(elapsed, 1)})
+            if not images and len(data_items) > 0:
+                logs += f"[{ts()}] ⚠️ API 返回 {len(data_items)} 张但下载全部失败\n"
+                monitor_steps.append({"step": "下载失败", "time": ts(), "elapsed": round(elapsed, 1), "error": "全部下载失败"})
+            else:
+                logs += f"[{ts()}] ✅ 完成! 耗时: {elapsed:.1f}s (API: {api_duration}s, 下载: {download_duration}s)\n"
+                monitor_steps.append({"step": "完成", "time": ts(), "elapsed": round(elapsed, 1), "total": round(elapsed, 1)})
 
             # 记录历史
             history_store.add({

@@ -10,32 +10,11 @@ from datetime import datetime
 
 from backend.config import settings
 from backend.services.yunwu_client import yunwu_client, YunwuAPIError
+from backend.services.image_utils import download_image as _download_image
 
 
 def _ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
-
-
-async def _download_image(url: str, task_id: str, index: int) -> str:
-    """从 URL 下载图片到本地"""
-    import httpx
-    save_dir = settings.image_save_dir
-    os.makedirs(save_dir, exist_ok=True)
-
-    ext = url.split(".")[-1].split("?")[0] or "jpg"
-    filename = f"{task_id}_{index}.{ext}"
-    filepath = os.path.join(save_dir, filename)
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            with open(filepath, "wb") as f:
-                f.write(resp.content)
-            return f"/api/images/{filename}"
-        except Exception as e:
-            print(f"下载图片失败 {url}: {e}")
-            return ""
 
 
 class TaskManager:
@@ -44,6 +23,7 @@ class TaskManager:
     def __init__(self):
         self._tasks: dict[str, dict] = {}
         self._lock = threading.Lock()
+        self._last_cleanup = time.time()
 
     def _get(self, task_id: str) -> dict:
         with self._lock:
@@ -57,6 +37,7 @@ class TaskManager:
     def create(self, task_id: str, initial: dict):
         with self._lock:
             self._tasks[task_id] = initial
+            self._maybe_cleanup()
 
     def get(self, task_id: str) -> dict:
         return self._get(task_id)
@@ -67,6 +48,21 @@ class TaskManager:
             task = self._tasks.get(task_id)
             if task:
                 task["logs"] = task.get("logs", "") + text + "\n"
+
+    def _maybe_cleanup(self):
+        """每 5 分钟清理一次超过 30 分钟的已完成/失败任务"""
+        now = time.time()
+        if now - self._last_cleanup < 300:
+            return
+        self._last_cleanup = now
+        expired = [
+            tid for tid, t in self._tasks.items()
+            if t.get("_done") and (now - t.get("_elapsed", 0) > 1800 or not t.get("_elapsed"))
+        ]
+        for tid in expired:
+            del self._tasks[tid]
+        if expired:
+            print(f"[TaskManager] 清理 {len(expired)} 个过期任务，剩余 {len(self._tasks)}")
 
     # ── Replicate 格式后台轮询 ──────────────────────────────
 
@@ -134,8 +130,8 @@ class TaskManager:
                                                          num_outputs, save_dir)
                     return
 
-                if time.time() - t0 > 300:
-                    self.append_log(task_id, f"[{_ts()}] ❌ 任务超时 (5分钟)")
+                if time.time() - t0 > 500:
+                    self.append_log(task_id, f"[{_ts()}] ❌ 任务超时 (500s)")
                     self._update(task_id, {"status": "failed", "error": "超时", "_done": True})
                     return
 

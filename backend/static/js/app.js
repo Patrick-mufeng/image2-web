@@ -51,11 +51,12 @@
     isGenerating: false, multiMode: false,
     mode: 'txt2img',  // 'txt2img' | 'img2img'
     uploadedFiles: [], // [{file, dataUrl}]
+    uploadTotalSize: 0,
     maskFile: null,
     historyPage: 1, historyLimit: 12, historyTotal: 0, historyRecords: [],
   };
 
-  let _pollTimer = null, _currentTaskId = null, _knownLogLen = 0;
+  let _pollTimer = null, _currentTaskId = null, _knownLogLen = 0, _cancelled = false;
 
   const esc = s => { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; };
   const fmtTime = iso => { if (!iso) return ''; try { return new Date(iso).toLocaleString('zh-CN'); } catch(e) { return iso; } };
@@ -258,12 +259,13 @@
         break;
       }
       // Check total size
-      const totalSize = S.uploadedFiles.reduce((s, f) => s + f.file.size, 0) + file.size;
-      if (totalSize > maxSize) {
+      const newTotal = S.uploadTotalSize + file.size;
+      if (newTotal > maxSize) {
         toast('图片总大小超过 50MB', 'error');
         break;
       }
       S.uploadedFiles.push({ file, dataUrl: URL.createObjectURL(file) });
+      S.uploadTotalSize += file.size;
       added++;
     }
     if (added) {
@@ -276,6 +278,7 @@
   function removeFile(index) {
     const item = S.uploadedFiles[index];
     if (item && item.dataUrl) URL.revokeObjectURL(item.dataUrl);
+    S.uploadTotalSize -= (item && item.file) ? item.file.size : 0;
     S.uploadedFiles.splice(index, 1);
     renderPreviews();
     updBtn();
@@ -680,7 +683,13 @@
   // ── Generate ──
   async function genOne(prompt, idx, total) {
     log('  ['+idx+'/'+total+'] 📤 '+prompt.slice(0,50)+(prompt.length>50?'…':''),'l');
-    const resp = await api('POST','/api/generate',{prompt,aspect_ratio:S.aspectRatio,megapixels:S.megapixels,num_outputs:1,model:S.model});
+    const resp = await api('POST','/api/generate',{
+      prompt, aspect_ratio: S.aspectRatio, megapixels: S.megapixels,
+      num_outputs: 1, output_format: S.outputFormat || 'jpg',
+      output_quality: S.outputQuality || 80,
+      num_inference_steps: S.numInferenceSteps || 4,
+      model: S.model
+    });
     if (resp.success && resp.images && resp.images.length) { log('  ['+idx+'/'+total+'] ✅ 完成','ok'); return {images:resp.images,request:resp.request_data,response:resp.response_data}; }
     log('  ['+idx+'/'+total+'] ❌ '+(resp.error||'失败'),'err');
     return {images:[],error:resp.error};
@@ -750,7 +759,14 @@
         finalizeMonitor(allImages.length>0); finishGen(); return;
       }
 
+      // 等待心跳：每 30s 输出一次日志，防止用户以为卡死
+      var heartbeatTimer = setInterval(function() {
+        var waited = ((Date.now() - t0) / 1000).toFixed(0);
+        log('⏳ 等待 API 响应中... 已等待 ' + waited + 's', 'l');
+      }, 30000);
       const resp = await api('POST','/api/generate',{prompt:S.prompt,aspect_ratio:S.aspectRatio,megapixels:S.megapixels,num_outputs:S.numOutputs,model:S.model});
+      clearInterval(heartbeatTimer);
+      if (_cancelled) { finishGen(); return; }  // 用户已取消，丢弃结果
 
       // 更新监控面板
       var steps = (resp.response_data && resp.response_data.monitor_steps) || [];
@@ -925,8 +941,8 @@
   }
 
   function stopPoll() { if(_pollTimer){clearTimeout(_pollTimer);_pollTimer=null;} _currentTaskId=null; _knownLogLen=0; }
-  function finishGen() { S.isGenerating=false; stopPoll(); DOM.btnGenerate.style.display=''; DOM.btnCancel.style.display='none'; updBtn(); }
-  function cancelGen() { S.isGenerating=false; stopPoll(); DOM.btnGenerate.style.display=''; DOM.btnCancel.style.display='none'; DOM.genBox.style.display='none'; if(!DOM.imgGrid.children.length) DOM.emptyState.style.display=''; updBtn(); log('⏹ 已取消','warn'); }
+  function finishGen() { S.isGenerating=false; _cancelled=false; stopPoll(); DOM.btnGenerate.style.display=''; DOM.btnCancel.style.display='none'; updBtn(); }
+  function cancelGen() { S.isGenerating=false; _cancelled=true; stopPoll(); DOM.btnGenerate.style.display=''; DOM.btnCancel.style.display='none'; DOM.genBox.style.display='none'; if(!DOM.imgGrid.children.length) DOM.emptyState.style.display=''; updBtn(); log('⏹ 已取消（正在进行的 API 请求无法中止）','warn'); toast('已取消，但 API 请求可能仍在处理中','info'); }
 
   // ── History ──
   async function loadHistory() {

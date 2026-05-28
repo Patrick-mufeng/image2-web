@@ -28,7 +28,7 @@ async def edit_image(
     prompt: str = Form(..., min_length=1, max_length=4000),
     model: str = Form("gpt-image-2"),
     size: str = Form("1024x1024"),
-    n: int = Form(1, ge=1, le=10),
+    n: int = Form(1, ge=1, le=4),
     quality: str = Form("auto"),
     background: str = Form("auto"),
     images: list[UploadFile] = File(..., description="图片文件，1-16张"),

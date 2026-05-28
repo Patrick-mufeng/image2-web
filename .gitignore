@@ -11,6 +11,9 @@ data/meta_images/
 product-showcase/
 image/
 
+# IDE / Tools
+.claude/
+
 # Python
 __pycache__/
 *.pyc
