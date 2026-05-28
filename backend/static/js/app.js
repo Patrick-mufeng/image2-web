@@ -463,6 +463,11 @@
         DOM.genBadge.textContent='❌ 失败'; DOM.genBadge.className='g-bdg fail';
         log('❌ '+(resp.error||'失败'),'err'); toast(resp.error||'失败','error');
         DOM.btnRetry.style.display = 'inline-flex';
+        // Show detailed error in monitor
+        if (resp.error_detail) {
+          DOM.monReq.textContent = JSON.stringify(resp.error_detail.request || {}, null, 2);
+          DOM.monRes.textContent = JSON.stringify(resp.error_detail.response || {}, null, 2);
+        }
         finalizeMonitor(false); finishGen(); return;
       }
 
@@ -573,6 +578,11 @@
         log('❌ ' + (resp.error || '失败'), 'err');
         toast(resp.error || '图生图失败', 'error');
         DOM.btnRetry.style.display = 'inline-flex';
+        // Show detailed error in monitor
+        if (resp.error_detail) {
+          DOM.monReq.textContent = JSON.stringify(resp.error_detail.request || {}, null, 2);
+          DOM.monRes.textContent = JSON.stringify(resp.error_detail.response || {}, null, 2);
+        }
       }
     } catch(e) {
       log('❌ ' + e.message, 'err');
@@ -611,6 +621,11 @@
           } else {
             DOM.genBadge.textContent='❌ 失败'; DOM.genBadge.className='g-bdg fail';
             log('❌ '+(data.error||data.status||'失败'),'err');
+            // Show detailed error in monitor
+            if (data.error_detail) {
+              DOM.monReq.textContent = JSON.stringify(data.error_detail.request || {}, null, 2);
+              DOM.monRes.textContent = JSON.stringify(data.error_detail.response || {}, null, 2);
+            }
             updateMonitor(data.request_data,data.response_data);
             toast(data.error||'失败','error'); finalizeMonitor(false);
           }

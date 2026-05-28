@@ -166,11 +166,13 @@ async def edit_image(
 
     except YunwuAPIError as e:
         error_log = logs + f"[{_ts()}] ❌ API错误: {str(e)[:300]}\n"
+        err_detail = e.to_dict() if hasattr(e, 'to_dict') else {"error": str(e)}
         from backend.services.log_store import log_store
-        log_store.add({
+        log_store.save_entry({
             "type": "edit", "status": "failed",
             "request": {"prompt": prompt[:150], "model": model},
-            "error": str(e)[:500], "total_time": time.time() - t0,
+            "error": str(e)[:500], "error_detail": err_detail,
+            "total_time": time.time() - t0,
         })
         return {"success": False, "error": str(e), "status": "failed", "logs": error_log, "total_time": time.time() - t0}
     except Exception as e:

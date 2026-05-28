@@ -237,13 +237,16 @@ async def generate_image(request: GenerateRequest):
             )
 
         except YunwuAPIError as e:
+            err_detail = e.to_dict() if hasattr(e, 'to_dict') else {"error": str(e)}
             err_log = logs + f"[{ts()}] ❌ API错误: {str(e)[:300]}\n"
             task_manager._update(task_id, {
                 "status": "failed", "error": str(e), "logs": err_log, "_done": True,
+                "error_detail": err_detail,
             })
-            log_store.add({
+            log_store.save_entry({
                 "type": "generate", "status": "failed",
                 "request": request_data, "error": str(e)[:500],
+                "error_detail": err_detail,
                 "total_time": time.time() - t0,
             })
             return GenerateResponse(

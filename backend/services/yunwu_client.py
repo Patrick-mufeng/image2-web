@@ -11,8 +11,19 @@ from backend.config import settings
 
 
 class YunwuAPIError(Exception):
-    """上游 API 错误"""
-    pass
+    """上游 API 错误，携带完整请求/响应信息"""
+
+    def __init__(self, message: str, request_info: dict = None, response_info: dict = None):
+        super().__init__(message)
+        self.request_info = request_info or {}
+        self.response_info = response_info or {}
+
+    def to_dict(self) -> dict:
+        return {
+            "error": str(self),
+            "request": self.request_info,
+            "response": self.response_info,
+        }
 
 
 class YunwuClient:
@@ -42,13 +53,26 @@ class YunwuClient:
         }
 
         url = f"{base_url}/v1/images/generations"
+        req_info = {
+            "method": "POST",
+            "url": url,
+            "headers": {k: v[:50] for k, v in self._headers().items()},
+            "body": payload,
+        }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(url, headers=self._headers(), json=payload)
+            resp_info = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body": resp.text[:2000],
+            }
 
             if resp.status_code != 200:
                 raise YunwuAPIError(
-                    f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}"
+                    f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}",
+                    request_info=req_info,
+                    response_info=resp_info,
                 )
 
             return resp.json()
@@ -76,13 +100,16 @@ class YunwuClient:
         }
 
         url = f"{base_url}/replicate/v1/models/{model}/predictions"
+        req_info = {"method": "POST", "url": url, "headers": {k: v[:50] for k, v in self._headers().items()}, "body": payload}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(url, headers=self._headers(), json=payload)
+            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
             if resp.status_code not in (200, 201):
                 raise YunwuAPIError(
-                    f"创建任务失败 ({resp.status_code}): {resp.text[:500]}"
+                    f"创建任务失败 ({resp.status_code}): {resp.text[:500]}",
+                    request_info=req_info, response_info=resp_info,
                 )
 
             return resp.json()
@@ -91,13 +118,16 @@ class YunwuClient:
         """查询 Replicate 格式预测任务状态"""
         base_url = settings.yunwu_base_url.rstrip("/")
         url = f"{base_url}/replicate/v1/predictions/{task_id}"
+        req_info = {"method": "GET", "url": url}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(url, headers=self._headers())
+            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
             if resp.status_code != 200:
                 raise YunwuAPIError(
-                    f"查询任务失败 ({resp.status_code}): {resp.text[:500]}"
+                    f"查询任务失败 ({resp.status_code}): {resp.text[:500]}",
+                    request_info=req_info, response_info=resp_info,
                 )
 
             return resp.json()
@@ -143,6 +173,12 @@ class YunwuClient:
         base_url = settings.yunwu_base_url.rstrip("/")
         url = f"{base_url}/v1/images/edits"
 
+        req_info = {
+            "method": "POST",
+            "url": url,
+            "body": {"prompt": prompt, "model": model, "n": n, "size": size, "quality": quality, "background": background, "image_size": len(image_data)},
+        }
+
         files = {
             "image": (filename, image_data, "image/png"),
             "prompt": (None, prompt),
@@ -155,6 +191,7 @@ class YunwuClient:
 
         if mask_data:
             files["mask"] = (mask_filename, mask_data, "image/png")
+            req_info["body"]["mask_size"] = len(mask_data)
 
         headers = {
             "Authorization": f"Bearer {settings.yunwu_api_key}",
@@ -163,10 +200,12 @@ class YunwuClient:
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(url, headers=headers, files=files)
+            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
             if resp.status_code != 200:
                 raise YunwuAPIError(
-                    f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}"
+                    f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}",
+                    request_info=req_info, response_info=resp_info,
                 )
 
             return resp.json()
@@ -188,13 +227,16 @@ class YunwuClient:
         }
 
         url = f"{base_url}/v1/images/generations"
+        req_info = {"method": "POST", "url": url, "headers": {k: v[:50] for k, v in self._headers().items()}, "body": payload}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.post(url, headers=self._headers(), json=payload)
+            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
             if resp.status_code != 200:
                 raise YunwuAPIError(
-                    f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}"
+                    f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}",
+                    request_info=req_info, response_info=resp_info,
                 )
 
             return resp.json()
