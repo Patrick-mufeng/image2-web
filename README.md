@@ -2,6 +2,8 @@
 
 基于 GPT Image 2 的 AI 图片生成桌面工具，支持文生图、图生图、实时监控等功能。
 
+<img width="1920" height="929" alt="觅图-1" src="https://github.com/user-attachments/assets/f15590bc-5026-4c60-afee-7d83cece0efb" />
+
 ## 快速开始
 
 1. **克隆项目**
@@ -52,6 +54,8 @@
 - 分类筛选 + 语言筛选（中文/English）
 - 分页浏览，图片本地缓存加载
 
+<img width="1920" height="929" alt="觅图-4" src="https://github.com/user-attachments/assets/5282d2a4-3bd2-4ad3-bbce-b48d19cdbeae" />
+
 ### 📡 实时监控
 - 每步操作的实时日志流
 - 请求/响应 JSON 完整展示
@@ -67,6 +71,8 @@
 - PS 预设一键套用
 - **💿 另存为预设** — 自定义预设永久保存
 - 批量处理后打包下载 ZIP
+
+<img width="1920" height="929" alt="觅图-6" src="https://github.com/user-attachments/assets/543f2aa4-ca65-4583-9891-26e4b2496e2a" />
 
 ---
 
