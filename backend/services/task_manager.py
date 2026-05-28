@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import threading
+import traceback
 from datetime import datetime
 
 from backend.config import settings
@@ -66,14 +67,6 @@ class TaskManager:
             task = self._tasks.get(task_id)
             if task:
                 task["logs"] = task.get("logs", "") + text + "\n"
-
-    def get_known_logs_len(self, task_id: str) -> int:
-        """返回已知日志长度（供前端增量获取）"""
-        with self._lock:
-            task = self._tasks.get(task_id)
-            if task:
-                return len(task.get("logs", ""))
-            return 0
 
     # ── Replicate 格式后台轮询 ──────────────────────────────
 
@@ -149,11 +142,12 @@ class TaskManager:
                 await asyncio.sleep(0.8)
 
         except YunwuAPIError as e:
-            self.append_log(task_id, f"[{_ts()}] ❌ API错误: {str(e)[:300]}")
+            self.append_log(task_id, f"[{_ts()}] ❌ API错误: {str(e)}")
             self._update(task_id, {"status": "failed", "error": str(e), "_done": True,
                                    "request_data": request_data})
         except Exception as e:
-            self.append_log(task_id, f"[{_ts()}] ❌ 异常: {str(e)[:300]}")
+            self.append_log(task_id, f"[{_ts()}] ❌ 异常: {str(e)}")
+            self.append_log(task_id, f"[{_ts()}] 📋 堆栈: {traceback.format_exc()[-500:]}")
             self._update(task_id, {"status": "failed", "error": str(e), "_done": True,
                                    "request_data": request_data})
 
@@ -193,7 +187,8 @@ class TaskManager:
             # 存历史
             from backend.services.history_store import history_store
             history_store.add({
-                "task_id": rid, "prompt": request_data.get("prompt", ""),
+                "task_id": task_id, "api_task_id": rid,
+                "prompt": request_data.get("prompt", ""),
                 "model": request_data.get("model", ""),
                 "aspect_ratio": request_data.get("aspect_ratio", "1:1"),
                 "megapixels": request_data.get("megapixels", "1"),

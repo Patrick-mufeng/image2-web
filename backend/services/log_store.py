@@ -27,9 +27,22 @@ class LogStore:
             with open(self.file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
+    @staticmethod
+    def _sanitize(obj):
+        """递归去除 b64_json 大字段，保留 url 等小数据"""
+        if isinstance(obj, dict):
+            return {k: ("[base64 data removed]" if k == "b64_json" and isinstance(v, str) and len(v) > 100
+                        else LogStore._sanitize(v))
+                    for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [LogStore._sanitize(item) for item in obj]
+        return obj
+
     def add(self, entry: dict):
         entry["id"] = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "_" + str(len(self._read()))
         entry["time"] = datetime.now(timezone.utc).isoformat()
+        if "response_body" in entry and entry["response_body"]:
+            entry["response_body"] = self._sanitize(entry["response_body"])
         records = self._read()
         records.insert(0, entry)
         self._write(records[:200])
@@ -44,6 +57,8 @@ class LogStore:
         """保存单条完整日志（请求+响应+错误），持久化到文件"""
         entry["id"] = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S") + "_" + str(len(self._read()))
         entry["time"] = datetime.now(timezone.utc).isoformat()
+        if "response_body" in entry and entry["response_body"]:
+            entry["response_body"] = self._sanitize(entry["response_body"])
         records = self._read()
         records.insert(0, entry)
         self._write(records[:200])

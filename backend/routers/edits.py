@@ -7,6 +7,7 @@ import os
 import time
 import base64
 import uuid
+import traceback
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
@@ -75,19 +76,24 @@ async def edit_image(
             else:
                 mask_data = None
 
-        # 调用编辑 API
-        result = await yunwu_client.edit_image(
-            image_data=image_datas[0][1],
-            prompt=prompt,
-            filename=image_datas[0][0],
-            model=model,
-            mask_data=mask_data,
-            mask_filename=mask_filename,
-            n=n,
-            size=size,
-            quality=quality,
-            background=background,
-        )
+        # 调用编辑 API（逐张处理多图）
+        all_results = []
+        for img_idx, (img_filename, img_data) in enumerate(image_datas):
+            if len(image_datas) > 1:
+                logs += f"[{_ts()}] 📤 处理图片 {img_idx+1}/{len(image_datas)}: {img_filename}\n"
+            result = await yunwu_client.edit_image(
+                image_data=img_data,
+                prompt=prompt,
+                filename=img_filename,
+                model=model,
+                mask_data=mask_data,
+                mask_filename=mask_filename,
+                n=n,
+                size=size,
+                quality=quality,
+                background=background,
+            )
+            all_results.append(result)
 
         logs += f"[{_ts()}] ✅ API 响应成功\n"
 
@@ -99,32 +105,32 @@ async def edit_image(
         images_out = []
         history_images = []
 
-        # edits 接口返回 b64_json
-        data_field = result.get("data", {})
-        if isinstance(data_field, dict) and data_field.get("b64_json"):
-            # 单张图片
-            logs += f"[{_ts()}] 💾 保存图片...\n"
-            filename = f"{task_id}_0.png"
-            filepath = os.path.join(save_dir, filename)
-            raw = base64.b64decode(data_field["b64_json"])
-            with open(filepath, "wb") as f:
+        def _save_b64(b64_str: str, idx: int) -> str:
+            fname = f"{task_id}_{idx}.png"
+            fpath = os.path.join(save_dir, fname)
+            raw = base64.b64decode(b64_str)
+            with open(fpath, "wb") as f:
                 f.write(raw)
-            local_path = f"/api/images/{filename}"
-            images_out.append({"local_path": local_path, "revised_prompt": ""})
-            history_images.append({"local_path": local_path, "revised_prompt": ""})
-        elif isinstance(data_field, list):
-            # 多张图片
-            for idx, item in enumerate(data_field):
-                if isinstance(item, dict) and item.get("b64_json"):
-                    logs += f"[{_ts()}] 💾 保存图片 {idx+1}/{len(data_field)}...\n"
-                    filename = f"{task_id}_{idx}.png"
-                    filepath = os.path.join(save_dir, filename)
-                    raw = base64.b64decode(item["b64_json"])
-                    with open(filepath, "wb") as f:
-                        f.write(raw)
-                    local_path = f"/api/images/{filename}"
-                    images_out.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
-                    history_images.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
+            return f"/api/images/{fname}"
+
+        img_counter = 0
+        for result in all_results:
+            # edits 接口返回 b64_json
+            data_field = result.get("data", {})
+            if isinstance(data_field, dict) and data_field.get("b64_json"):
+                logs += f"[{_ts()}] 💾 保存图片 {img_counter+1}...\n"
+                local_path = _save_b64(data_field["b64_json"], img_counter)
+                images_out.append({"local_path": local_path, "revised_prompt": ""})
+                history_images.append({"local_path": local_path, "revised_prompt": ""})
+                img_counter += 1
+            elif isinstance(data_field, list):
+                for item in data_field:
+                    if isinstance(item, dict) and item.get("b64_json"):
+                        logs += f"[{_ts()}] 💾 保存图片 {img_counter+1}/{img_counter+len(data_field)}...\n"
+                        local_path = _save_b64(item["b64_json"], img_counter)
+                        images_out.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
+                        history_images.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
+                        img_counter += 1
 
         elapsed = time.time() - t0
         logs += f"[{_ts()}] ✅ 完成! 耗时: {elapsed:.1f}s\n"
@@ -148,8 +154,8 @@ async def edit_image(
         log_store.add({
             "type": "edit",
             "status": "succeeded",
-            "request": {"prompt": prompt[:150], "model": model, "size": size, "n": n},
-            "response_body": result,
+            "request": {"prompt": prompt[:150], "model": model, "size": size, "n": n, "image_count": len(images)},
+            "response_body": all_results[0] if all_results else {},
             "total_time": elapsed,
             "error": None,
         })
@@ -160,12 +166,12 @@ async def edit_image(
             "images": images_out,
             "status": "succeeded",
             "logs": logs,
-            "response_data": result,
+            "response_data": all_results[0] if all_results else {},
             "total_time": elapsed,
         }
 
     except YunwuAPIError as e:
-        error_log = logs + f"[{_ts()}] ❌ API错误: {str(e)[:300]}\n"
+        error_log = logs + f"[{_ts()}] ❌ API错误: {str(e)}\n"
         err_detail = e.to_dict() if hasattr(e, 'to_dict') else {"error": str(e)}
         from backend.services.log_store import log_store
         log_store.save_entry({
@@ -174,7 +180,9 @@ async def edit_image(
             "error": str(e)[:500], "error_detail": err_detail,
             "total_time": time.time() - t0,
         })
-        return {"success": False, "error": str(e), "status": "failed", "logs": error_log, "total_time": time.time() - t0}
+        return {"success": False, "error": str(e), "status": "failed", "logs": error_log, "total_time": round(time.time() - t0, 1)}
     except Exception as e:
-        error_log = logs + f"[{_ts()}] ❌ 异常: {str(e)[:300]}\n"
-        return {"success": False, "error": f"服务器错误: {str(e)}", "status": "failed", "logs": error_log, "total_time": time.time() - t0}
+        full_tb = traceback.format_exc()
+        error_log = logs + f"[{_ts()}] ❌ 异常: {str(e)}\n"
+        error_log += f"[{_ts()}] 📋 堆栈: {full_tb[-500:]}\n"
+        return {"success": False, "error": f"服务器错误: {str(e)}", "status": "failed", "logs": error_log, "total_time": round(time.time() - t0, 1)}

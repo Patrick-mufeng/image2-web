@@ -9,6 +9,7 @@ import os
 import time
 import uuid
 import json
+import traceback
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -68,6 +69,10 @@ def ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
 
+def ms() -> str:
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+
 @router.post("/generate")
 async def generate_image(request: GenerateRequest):
     """文生图 — 立即返回 task_id，后台异步执行"""
@@ -91,8 +96,14 @@ async def generate_image(request: GenerateRequest):
         "aspect_ratio": request.aspect_ratio,
         "megapixels": request.megapixels,
         "num_outputs": request.num_outputs,
+        "output_format": request.output_format,
+        "output_quality": request.output_quality,
+        "num_inference_steps": request.num_inference_steps,
         "prompt": request.prompt[:150] + ("..." if len(request.prompt) > 150 else ""),
+        "prompt_full_length": len(request.prompt),
     }
+
+    monitor_steps = []  # 分步耗时记录
 
     if use_replicate:
         # ═══ Replicate 格式：立即返回，后台轮询 ═══
@@ -112,6 +123,7 @@ async def generate_image(request: GenerateRequest):
             "error": None,
             "response_data": {},
             "request_data": request_data,
+            "monitor_steps": [],
             "_done": False,
             "_elapsed": 0,
             "_openai": False,
@@ -142,9 +154,9 @@ async def generate_image(request: GenerateRequest):
         size = resolve_size(request.aspect_ratio, request.megapixels)
         logs = ""
         logs += f"[{ts()}] 🚀 开始生成 (OpenAI 即时模式)\n"
-        logs += f"[{ts()}] 模型: {request.model}\n"
-        logs += f"[{ts()}] 尺寸: {size} | 数量: {request.num_outputs}\n"
-        logs += f"[{ts()}] 📤 发送请求到 API...\n"
+        logs += f"[{ts()}] 模型: {request.model} | 尺寸: {size} | 数量: {request.num_outputs}\n"
+        logs += f"[{ts()}] Prompt 长度: {len(request.prompt)} chars\n"
+        monitor_steps.append({"step": "开始", "time": ts(), "elapsed": 0})
 
         # 先创建任务状态
         task_manager.create(task_id, {
@@ -156,25 +168,39 @@ async def generate_image(request: GenerateRequest):
             "error": None,
             "response_data": {},
             "request_data": request_data,
+            "monitor_steps": [],
             "_done": False,
             "_elapsed": 0,
             "_openai": True,
         })
 
         try:
+            # 记录 API 请求开始
+            t_api_start = time.time()
+            logs += f"[{ts()}] 📤 发送请求到 API...\n"
+            task_manager.append_log(task_id, f"[{ts()}] 📤 发送请求到 API...")
+            monitor_steps.append({"step": "API 请求发送", "time": ts(), "elapsed": round(t_api_start - t0, 2)})
+
             result = await yunwu_client.openai_generate(
                 prompt=request.prompt, model=request.model,
                 size=size, n=request.num_outputs,
             )
 
-            logs += f"[{ts()}] ✅ API 响应成功\n"
-            task_manager.append_log(task_id, f"[{ts()}] ✅ API 响应成功")
+            t_api_end = time.time()
+            api_duration = round(t_api_end - t_api_start, 1)
+            logs += f"[{ts()}] ✅ API 响应成功 (耗时 {api_duration}s)\n"
+            task_manager.append_log(task_id, f"[{ts()}] ✅ API 响应成功 (耗时 {api_duration}s)")
             task_manager.append_log(task_id, f"[{ts()}] 📥 处理图片...")
+            monitor_steps.append({"step": "API 响应接收", "time": ts(), "elapsed": round(t_api_end - t0, 2), "api_duration": api_duration})
 
             images = []
             history_images = []
             data_items = result.get("data", [])
+            # 兼容 API 返回单个对象而非列表的情况
+            if isinstance(data_items, dict):
+                data_items = [data_items]
 
+            t_dl_start = time.time()
             for idx, item in enumerate(data_items):
                 if item.get("url"):
                     logs += f"[{ts()}] 📥 下载图片 {idx+1}/{len(data_items)}...\n"
@@ -201,8 +227,14 @@ async def generate_image(request: GenerateRequest):
                         "revised_prompt": item.get("revised_prompt", ""),
                     })
 
+            t_dl_end = time.time()
+            download_duration = round(t_dl_end - t_dl_start, 1)
+            if len(data_items) > 0:
+                monitor_steps.append({"step": "图片下载/保存", "time": ts(), "elapsed": round(t_dl_end - t0, 2), "download_duration": download_duration})
+
             elapsed = time.time() - t0
-            logs += f"[{ts()}] ✅ 完成! 耗时: {elapsed:.1f}s\n"
+            logs += f"[{ts()}] ✅ 完成! 耗时: {elapsed:.1f}s (API: {api_duration}s, 下载: {download_duration}s)\n"
+            monitor_steps.append({"step": "完成", "time": ts(), "elapsed": round(elapsed, 1), "total": round(elapsed, 1)})
 
             # 记录历史
             history_store.add({
@@ -219,6 +251,7 @@ async def generate_image(request: GenerateRequest):
                 "output": [img.url for img in images if img.url],
                 "local_images": [img.local_path for img in images if img.local_path],
                 "response_data": result,
+                "monitor_steps": monitor_steps,
                 "_done": True,
                 "_elapsed": elapsed,
             })
@@ -238,37 +271,45 @@ async def generate_image(request: GenerateRequest):
 
         except YunwuAPIError as e:
             err_detail = e.to_dict() if hasattr(e, 'to_dict') else {"error": str(e)}
-            err_log = logs + f"[{ts()}] ❌ API错误: {str(e)[:300]}\n"
+            full_err = str(e)
+            err_log = logs + f"[{ts()}] ❌ API错误: {full_err}\n"
+            monitor_steps.append({"step": "API 错误", "time": ts(), "elapsed": round(time.time() - t0, 1), "error": full_err[:500]})
             task_manager._update(task_id, {
-                "status": "failed", "error": str(e), "logs": err_log, "_done": True,
-                "error_detail": err_detail,
+                "status": "failed", "error": full_err, "logs": err_log, "_done": True,
+                "error_detail": err_detail, "monitor_steps": monitor_steps,
             })
             log_store.save_entry({
                 "type": "generate", "status": "failed",
-                "request": request_data, "error": str(e)[:500],
+                "request": request_data, "error": full_err[:500],
                 "error_detail": err_detail,
                 "total_time": time.time() - t0,
             })
             return GenerateResponse(
-                success=False, error=str(e), status="failed",
-                logs=err_log, request_data=request_data,
-                total_time=time.time() - t0,
+                success=False, error=full_err[:500], status="failed",
+                logs=err_log, request_data=request_data, response_data=err_detail,
+                total_time=round(time.time() - t0, 1),
             )
         except Exception as e:
-            err_log = logs + f"[{ts()}] ❌ 异常: {str(e)[:300]}\n"
+            full_err = str(e)
+            full_tb = traceback.format_exc()
+            err_log = logs + f"[{ts()}] ❌ 异常: {full_err}\n"
+            err_log += f"[{ts()}] 📋 堆栈:\n{full_tb[-500:]}\n"
+            monitor_steps.append({"step": "异常", "time": ts(), "elapsed": round(time.time() - t0, 1), "error": full_err, "traceback": full_tb[-1000:]})
             task_manager._update(task_id, {
-                "status": "failed", "error": str(e), "logs": err_log, "_done": True,
+                "status": "failed", "error": full_err, "logs": err_log, "_done": True,
+                "monitor_steps": monitor_steps,
             })
             return GenerateResponse(
-                success=False, error=f"服务器错误: {str(e)}", status="failed",
+                success=False, error=f"服务器错误: {full_err[:300]}", status="failed",
                 logs=err_log, request_data=request_data,
-                total_time=time.time() - t0,
+                response_data={"error": full_err, "traceback": full_tb[-1000:]},
+                total_time=round(time.time() - t0, 1),
             )
 
 
 @router.get("/task/{task_id}")
 async def get_task_status(task_id: str):
-    """实时查询任务状态 — 前端每 500ms 轮询"""
+    """实时查询任务状态 — 前端每 600ms 轮询"""
     # 先查内存任务管理器
     task = task_manager.get(task_id)
     if task:
@@ -281,6 +322,8 @@ async def get_task_status(task_id: str):
             "error": task.get("error"),
             "response_data": task.get("response_data", {}),
             "request_data": task.get("request_data", {}),
+            "error_detail": task.get("error_detail"),
+            "monitor_steps": task.get("monitor_steps", []),
             "_done": task.get("_done", False),
             "_elapsed": task.get("_elapsed", 0),
             "_openai": task.get("_openai", False),
@@ -306,9 +349,23 @@ async def get_task_status(task_id: str):
 
 
 @router.get("/logs")
-async def get_logs(limit: int = 50):
-    """获取最近的请求日志"""
-    return {"logs": log_store.get_recent(limit)}
+async def get_logs(limit: int = 50, page: int = 1):
+    """获取最近的请求日志（分页）"""
+    all_logs = log_store.get_recent(200)  # 最多 200 条
+    total = len(all_logs)
+    start = (page - 1) * limit
+    page_logs = all_logs[start:start + limit]
+    return {"logs": page_logs, "total": total, "page": page, "limit": limit}
+
+
+@router.get("/logs/detail/{log_id}")
+async def get_log_detail(log_id: str):
+    """获取单条日志详情"""
+    all_logs = log_store.get_recent(200)
+    for entry in all_logs:
+        if entry.get("id") == log_id:
+            return {"found": True, "entry": entry}
+    return {"found": False, "entry": None}
 
 
 @router.delete("/logs")

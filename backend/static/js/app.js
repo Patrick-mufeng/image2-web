@@ -23,8 +23,15 @@
     historyGrid: $('historyGrid'), historyEmpty: $('historyEmpty'),
     historyPages: $('historyPages'), btnClearHistory: $('btnClearHistory'),
     monLive: $('monLive'), monEmpty: $('monEmpty'), monBody: $('monBody'),
-    monReq: $('monReq'), monRes: $('monRes'), monResTag: $('monResTag'),
-    tlProcess: $('tlProcess'), tlDone: $('tlDone'),
+    monTaskId: $('monTaskId'),
+    monSbStatus: $('monSbStatus'), monSbElapsed: $('monSbElapsed'),
+    monSbModel: $('monSbModel'), monSbSize: $('monSbSize'), monSbTag: $('monSbTag'),
+    monProgFill: $('monProgFill'), monProgSteps: $('monProgSteps'),
+    monReqTable: $('monReqTable'), monReqPrompt: $('monReqPrompt'),
+    monResTable: $('monResTable'), monRes: $('monRes'),
+    monResTag: $('monResTag'), monResJsonTitle: $('monResJsonTitle'),
+    monStepsBody: $('monStepsBody'),
+    monError: $('monError'), monErrMsg: $('monErrMsg'), monErrTrace: $('monErrTrace'),
     toastWrap: $('toastWrap'), lightbox: $('lightbox'), lbImg: $('lbImg'),
     // Image-to-image
     btnModeTxt2Img: $('btnModeTxt2Img'), btnModeImg2Img: $('btnModeImg2Img'),
@@ -80,6 +87,7 @@
       const pane = document.getElementById('tab' + tab);
       if (pane) pane.classList.add('active');
       S.tab = +tab;
+      if (tab === '5') loadMonitorHistory();
     });
   });
 
@@ -87,6 +95,7 @@
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', +b.dataset.tab === tab));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', +p.id.replace('tab','') === tab));
     S.tab = tab;
+    if (tab === 5) loadMonitorHistory();
   }
 
   // ── Status ──
@@ -367,27 +376,305 @@
     catch(e) { toast('复制失败','error'); }
   };
 
-  // ── Tab 3: Monitor ──
-  function updateMonitor(reqData, resData) {
-    DOM.monEmpty.style.display='none'; DOM.monBody.style.display='flex';
-    DOM.btnClearMonitor.style.display='inline-flex';
-    if (reqData) { S.lastReqData=reqData; DOM.monReq.textContent=JSON.stringify(reqData,null,2); }
-    if (resData) { S.lastResData=resData; DOM.monRes.textContent=JSON.stringify(resData,null,2); }
-    DOM.monLive.className='mon-live active'; DOM.monLive.innerHTML='<span class="pulse">●</span> 实时';
-    DOM.monResTag.className='mon-tag pending'; DOM.monResTag.textContent='⏳ 接收中';
-    DOM.tlProcess.classList.add('active');
+  // ═══ Tab 5: Monitor ═══
+  var _monState = { reqData: null, resData: null, steps: [], startTime: 0 };
+
+  function initMonitor(reqData) {
+    _monState = { reqData: reqData, resData: null, steps: [], startTime: Date.now() };
+    DOM.monEmpty.style.display = 'none';
+    DOM.monBody.style.display = 'flex';
+    DOM.btnClearMonitor.style.display = 'inline-flex';
+
+    // Status bar
+    DOM.monLive.className = 'mon-live active';
+    DOM.monLive.innerHTML = '<span class="pulse">●</span> 实时监控中';
+    DOM.monTaskId.style.display = '';
+    DOM.monTaskId.textContent = reqData.task_id || '';
+    DOM.monSbStatus.textContent = '⏳ 处理中';
+    DOM.monSbElapsed.textContent = '0.0s';
+    DOM.monSbModel.textContent = reqData.model || '-';
+    DOM.monSbSize.textContent = (reqData.aspect_ratio || '') + ' ' + (reqData.megapixels || '') + 'MP';
+    DOM.monSbTag.className = 'mon-sb-tag running';
+    DOM.monSbTag.textContent = '处理中';
+
+    // Progress
+    DOM.monProgFill.className = 'mon-prog-fill';
+    DOM.monProgFill.style.width = '0%';
+    updateProgSteps('send');
+
+    // Request panel
+    renderReqPanel(reqData);
+
+    // Response panel
+    DOM.monResTable.innerHTML = '<tr><td>状态</td><td style="color:var(--orange)">⏳ 等待响应...</td></tr>';
+    DOM.monResTag.className = 'mon-tag pending';
+    DOM.monResTag.textContent = 'PENDING';
+    DOM.monRes.textContent = '';
+    DOM.monRes.style.display = 'none';
+    DOM.monResJsonTitle.style.display = 'none';
+
+    // Steps
+    DOM.monStepsBody.innerHTML = '<p style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px">等待数据...</p>';
+
+    // Error
+    DOM.monError.style.display = 'none';
   }
-  function finalizeMonitor(ok) {
+
+  function renderReqPanel(d) {
+    if (!d) return;
+    var rows = [
+      ['模型', esc(d.model || '-')],
+      ['比例', esc(d.aspect_ratio || '-')],
+      ['分辨率', esc(d.megapixels || '-') + ' MP'],
+      ['生成数量', esc(String(d.num_outputs || 1)) + ' 张'],
+      ['输出格式', esc(d.output_format || 'jpg')],
+      ['画质', esc(String(d.output_quality || 80))],
+      ['推理步数', esc(String(d.num_inference_steps || 4))],
+      ['Prompt长度', esc(String(d.prompt_full_length || (d.prompt ? d.prompt.length : 0))) + ' chars'],
+    ];
+    DOM.monReqTable.innerHTML = rows.map(function(r) {
+      return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+    }).join('');
+    DOM.monReqPrompt.textContent = d.prompt || '';
+  }
+
+  function updateProgSteps(step) {
+    var steps = DOM.monProgSteps.querySelectorAll('.mp-step');
+    var order = ['send', 'api', 'download', 'done'];
+    var idx = order.indexOf(step);
+    steps.forEach(function(s, i) {
+      s.classList.remove('active', 'done');
+      if (i < idx) s.classList.add('done');
+      else if (i === idx) s.classList.add('active');
+    });
+    // Prog fill
+    var pct = Math.min(95, (idx / (order.length - 1)) * 100);
+    DOM.monProgFill.style.width = pct + '%';
+  }
+
+  function updateMonitorLive(elapsed) {
+    _monState.elapsed = elapsed;
+    var sec = elapsed.toFixed(1);
+    DOM.monSbElapsed.textContent = sec + 's';
+    DOM.monLive.innerHTML = '<span class="pulse">●</span> ' + sec + 's';
+  }
+
+  function updateMonitorSteps(steps) {
+    _monState.steps = steps || [];
+    if (!_monState.steps.length) return;
+    DOM.monStepsBody.innerHTML = _monState.steps.map(function(s, i) {
+      var last = i === _monState.steps.length - 1;
+      var isErr = !!s.error;
+      var dotCls = isErr ? 'err' : (last ? 'ok' : 'active');
+      var elapsed = s.elapsed != null ? s.elapsed + 's' : '-';
+      var elapsedCls = isErr ? 'err' : '';
+      var meta = [];
+      if (s.api_duration) meta.push('API耗时 ' + s.api_duration + 's');
+      if (s.download_duration) meta.push('下载 ' + s.download_duration + 's');
+      if (s.total) meta.push('总计 ' + s.total + 's');
+      return '<div class="mon-step-row">' +
+        '<span class="mon-step-dot ' + dotCls + '"></span>' +
+        '<div class="mon-step-info">' +
+        '<div class="mon-step-label">' + esc(s.step) + '</div>' +
+        (meta.length ? '<div class="mon-step-meta">' + meta.join(' · ') + '</div>' : '') +
+        '</div>' +
+        '<div class="mon-step-time">' +
+        '<div class="mon-step-elapsed ' + elapsedCls + '">+' + elapsed + '</div>' +
+        '<div>' + esc(s.time || '') + '</div>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function updateMonitorRes(resData, ok) {
+    _monState.resData = resData;
+    if (!resData) return;
+
     if (ok) {
-      DOM.monLive.className='mon-live'; DOM.monLive.innerHTML='● 请求完成';
-      DOM.monResTag.className='mon-tag live'; DOM.monResTag.textContent='✅ RECEIVED';
-      DOM.tlProcess.classList.remove('active'); DOM.tlProcess.classList.add('done');
-      DOM.tlDone.classList.add('done');
-      setTimeout(() => { DOM.tlProcess.classList.remove('done'); DOM.tlDone.classList.remove('done'); }, 3000);
+      DOM.monResTag.className = 'mon-tag ok';
+      DOM.monResTag.textContent = 'SUCCESS';
+      DOM.monSbStatus.textContent = '✅ 完成';
+      DOM.monSbTag.className = 'mon-sb-tag done';
+      DOM.monSbTag.textContent = '完成';
+      DOM.monProgFill.className = 'mon-prog-fill done';
+      DOM.monProgFill.style.width = '100%';
+      updateProgSteps('done');
+      DOM.monResTable.innerHTML = '<tr><td>状态</td><td style="color:var(--green)">✅ 成功</td></tr>' +
+        '<tr><td>耗时</td><td>' + (_monState.elapsed || 0).toFixed(1) + 's</td></tr>';
+      DOM.monLive.className = 'mon-live';
+      DOM.monLive.innerHTML = '● 请求完成';
     } else {
-      DOM.monLive.className='mon-live'; DOM.monLive.innerHTML='● 请求失败';
-      DOM.monResTag.className='mon-tag'; DOM.monResTag.textContent='❌ FAILED';
+      DOM.monResTag.className = 'mon-tag fail';
+      DOM.monResTag.textContent = 'FAILED';
+      DOM.monSbStatus.textContent = '❌ 失败';
+      DOM.monSbTag.className = 'mon-sb-tag failed';
+      DOM.monSbTag.textContent = '失败';
+      DOM.monProgFill.className = 'mon-prog-fill failed';
+      DOM.monProgFill.style.width = '100%';
+      DOM.monLive.className = 'mon-live failed';
+      DOM.monLive.innerHTML = '● 请求失败';
+      var errMsg = resData.error || (typeof resData === 'string' ? resData : '未知错误');
+      DOM.monResTable.innerHTML = '<tr><td>状态</td><td style="color:var(--red)">❌ 失败</td></tr>' +
+        '<tr><td>错误</td><td style="color:var(--red)">' + esc(String(errMsg).slice(0, 300)) + '</td></tr>';
+      // Show error panel
+      if (resData.error || resData.traceback) {
+        DOM.monError.style.display = '';
+        DOM.monErrMsg.textContent = resData.error || String(errMsg);
+        if (resData.traceback) {
+          DOM.monErrTrace.textContent = resData.traceback;
+          DOM.monErrTrace.style.display = '';
+        } else {
+          DOM.monErrTrace.style.display = 'none';
+        }
+      }
     }
+
+    // Show raw JSON
+    DOM.monResJsonTitle.style.display = '';
+    DOM.monRes.textContent = JSON.stringify(resData, null, 2);
+    DOM.monRes.style.display = '';
+  }
+
+  function updateMonitor(reqData, resData, steps) {
+    // Full initial setup
+    initMonitor(reqData || _monState.reqData || {});
+    if (steps && steps.length) updateMonitorSteps(steps);
+    if (resData) updateMonitorRes(resData, true);
+  }
+
+  function finalizeMonitor(ok, steps) {
+    if (steps && steps.length) updateMonitorSteps(steps);
+    if (_monState.resData) {
+      updateMonitorRes(_monState.resData, ok);
+    } else if (!ok) {
+      updateMonitorRes({ error: '请求失败' }, false);
+    }
+    // 自动刷新历史列表
+    setTimeout(function() { loadMonitorHistory(); }, 500);
+  }
+
+  function showMonitorError(errorMsg, traceback) {
+    DOM.monError.style.display = '';
+    DOM.monErrMsg.textContent = errorMsg || '';
+    DOM.monErrTrace.textContent = traceback || '';
+    DOM.monErrTrace.style.display = traceback ? '' : 'none';
+  }
+
+  // ═══ Monitor History ═══
+  var _monHistory = { entries: [], selectedId: null };
+
+  async function loadMonitorHistory() {
+    try {
+      var data = await api('GET', '/api/logs?limit=50&page=1');
+      _monHistory.entries = data.logs || [];
+      renderMonitorHistory();
+    } catch(e) {
+      DOM.monHistoryList.innerHTML = '<p class="mh-empty">加载失败</p>';
+    }
+  }
+
+  function renderMonitorHistory() {
+    var entries = _monHistory.entries;
+    DOM.monHistoryCount.textContent = entries.length + ' 条';
+    if (!entries.length) {
+      DOM.monHistoryList.innerHTML = '<p class="mh-empty">暂无历史记录</p>';
+      return;
+    }
+    DOM.monHistoryList.innerHTML = entries.map(function(e, i) {
+      var isOk = e.status === 'succeeded';
+      var timeLabel = e.time ? fmtTime(e.time) : (e.id || '');
+      var model = (e.request && e.request.model) || '-';
+      var prompt = (e.request && e.request.prompt) || '';
+      var elapsed = e.total_time ? e.total_time.toFixed(1) + 's' : '';
+      var type = e.type === 'edit' ? '🖼' : '🎨';
+      var activeCls = e.id === _monHistory.selectedId ? ' active' : '';
+      return '<div class="mh-item' + activeCls + '" data-id="' + esc(e.id) + '" data-idx="' + i + '">' +
+        '<span class="mh-status ' + (isOk ? 'ok' : 'err') + '"></span>' +
+        '<div class="mh-info">' +
+        '<div class="mh-info-top"><span class="mh-model">' + type + ' ' + esc(model) + '</span><span class="mh-time">' + esc(timeLabel) + '</span></div>' +
+        '<div class="mh-prompt">' + esc(prompt) + '</div>' +
+        '<div class="mh-meta"><span>' + (isOk ? '✅' : '❌') + ' ' + (e.status || '') + '</span>' + (elapsed ? '<span>⏱ ' + elapsed + '</span>' : '') + '</div>' +
+        '</div></div>';
+    }).join('');
+
+    // Bind clicks
+    DOM.monHistoryList.querySelectorAll('.mh-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        var idx = parseInt(item.dataset.idx);
+        var entry = _monHistory.entries[idx];
+        if (!entry) return;
+        _monHistory.selectedId = entry.id;
+        renderMonitorHistory();
+        showHistoryDetail(entry);
+      });
+    });
+  }
+
+  function showHistoryDetail(entry) {
+    // Populate monitor panels with history entry data
+    DOM.monEmpty.style.display = 'none';
+    DOM.monBody.style.display = 'flex';
+    DOM.btnClearMonitor.style.display = 'inline-flex';
+
+    // Status bar for history
+    DOM.monLive.className = 'mon-live' + (entry.status === 'succeeded' ? '' : ' failed');
+    DOM.monLive.innerHTML = entry.status === 'succeeded' ? '● 历史记录' : '● 历史记录 (失败)';
+    DOM.monTaskId.style.display = '';
+    DOM.monTaskId.textContent = entry.id || '';
+    DOM.monSbStatus.textContent = entry.status === 'succeeded' ? '📋 已完成' : '📋 已失败';
+    DOM.monSbElapsed.textContent = entry.total_time ? entry.total_time.toFixed(1) + 's' : '-';
+    DOM.monSbModel.textContent = (entry.request && entry.request.model) || '-';
+    DOM.monSbSize.textContent = (entry.request && entry.request.aspect_ratio) || '-';
+    DOM.monSbTag.className = 'mon-sb-tag ' + (entry.status === 'succeeded' ? 'done' : 'failed');
+    DOM.monSbTag.textContent = entry.status === 'succeeded' ? '历史' : '失败';
+
+    // Request panel
+    if (entry.request) {
+      renderReqPanel(entry.request);
+    }
+
+    // Response panel
+    var isOk = entry.status === 'succeeded';
+    DOM.monResTag.className = 'mon-tag ' + (isOk ? 'ok' : 'fail');
+    DOM.monResTag.textContent = isOk ? 'SUCCESS' : 'FAILED';
+    if (isOk) {
+      DOM.monResTable.innerHTML = '<tr><td>状态</td><td style="color:var(--green)">✅ 成功</td></tr>' +
+        '<tr><td>耗时</td><td>' + (entry.total_time || 0).toFixed(1) + 's</td></tr>';
+    } else {
+      DOM.monResTable.innerHTML = '<tr><td>状态</td><td style="color:var(--red)">❌ 失败</td></tr>' +
+        '<tr><td>错误</td><td style="color:var(--red)">' + esc((entry.error || '').slice(0, 200)) + '</td></tr>';
+    }
+
+    // Raw JSON
+    DOM.monResJsonTitle.style.display = '';
+    DOM.monRes.textContent = JSON.stringify(entry.response_body || entry, null, 2);
+    DOM.monRes.style.display = '';
+
+    // Steps (not available for history, but show what we have)
+    DOM.monStepsBody.innerHTML = '<p style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px">无分步数据（历史记录）</p>';
+
+    // Error panel
+    if (!isOk && entry.error) {
+      DOM.monError.style.display = '';
+      DOM.monErrMsg.textContent = entry.error;
+      DOM.monErrTrace.style.display = entry.error_detail ? '' : 'none';
+      DOM.monErrTrace.textContent = entry.error_detail ? JSON.stringify(entry.error_detail, null, 2) : '';
+    } else {
+      DOM.monError.style.display = 'none';
+    }
+
+    // Progress bar
+    DOM.monProgFill.className = 'mon-prog-fill ' + (isOk ? 'done' : 'failed');
+    DOM.monProgFill.style.width = '100%';
+    updateProgSteps('done');
+  }
+
+  // Refresh button
+  var btnRefreshHistory = document.getElementById('btnRefreshHistory');
+  if (btnRefreshHistory) {
+    btnRefreshHistory.addEventListener('click', function() {
+      loadMonitorHistory();
+      toast('已刷新', 'info');
+    });
   }
 
   // ── Generate ──
@@ -424,13 +711,20 @@
     DOM.genBar.className='g-fill idet'; DOM.genBadge.textContent='请求中'; DOM.genBadge.className='g-bdg';
     updBtn();
     DOM.monEmpty.style.display='none'; DOM.monBody.style.display='flex';
-    DOM.monReq.textContent='等待请求…'; DOM.monRes.textContent='等待响应…';
     log(isMulti?'🚀 批量生成 '+prompts.length+' 张不同图片':'🚀 开始生成','hl');
     log(S.aspectRatio+' · '+S.megapixels+'MP · '+S.model,'l');
     S.lastPrompt = S.prompt;
     const t0 = Date.now(); switchTab(1);
     DOM.btnRetry.style.display = 'none';
     DOM.btnDownloadAll.style.display = 'none';
+
+    // 初始化监控面板
+    var monReqData = {
+      model: S.model, aspect_ratio: S.aspectRatio, megapixels: S.megapixels,
+      num_outputs: S.numOutputs, prompt: S.prompt.slice(0, 150),
+      prompt_full_length: S.prompt.length,
+    };
+    initMonitor(monReqData);
 
     try {
       if (isMulti) {
@@ -457,18 +751,18 @@
       }
 
       const resp = await api('POST','/api/generate',{prompt:S.prompt,aspect_ratio:S.aspectRatio,megapixels:S.megapixels,num_outputs:S.numOutputs,model:S.model});
-      updateMonitor(resp.request_data||{prompt:S.prompt,model:S.model},resp.response_data||null);
+
+      // 更新监控面板
+      var steps = (resp.response_data && resp.response_data.monitor_steps) || [];
+      _monState.elapsed = resp.total_time || 0;
+      updateMonitorSteps(steps);
+      updateMonitorRes(resp.response_data || resp, resp.success);
 
       if (!resp.success) {
         DOM.genBadge.textContent='❌ 失败'; DOM.genBadge.className='g-bdg fail';
         log('❌ '+(resp.error||'失败'),'err'); toast(resp.error||'失败','error');
         DOM.btnRetry.style.display = 'inline-flex';
-        // Show detailed error in monitor
-        if (resp.error_detail) {
-          DOM.monReq.textContent = JSON.stringify(resp.error_detail.request || {}, null, 2);
-          DOM.monRes.textContent = JSON.stringify(resp.error_detail.response || {}, null, 2);
-        }
-        finalizeMonitor(false); finishGen(); return;
+        finalizeMonitor(false, steps); finishGen(); return;
       }
 
       if (resp.logs) resp.logs.split('\n').filter(Boolean).forEach(l=>log(l,'l'));
@@ -512,9 +806,10 @@
     DOM.genBar.className='g-fill idet'; DOM.genBadge.textContent='上传中'; DOM.genBadge.className='g-bdg';
     updBtn();
     DOM.monEmpty.style.display='none'; DOM.monBody.style.display='flex';
-    DOM.monReq.textContent='等待请求…'; DOM.monRes.textContent='等待响应…';
     DOM.btnRetry.style.display = 'none';
     DOM.btnDownloadAll.style.display = 'none';
+    // 初始化监控
+    initMonitor({ model: S.model, aspect_ratio: S.aspectRatio, megapixels: S.megapixels, num_outputs: S.numOutputs, prompt: S.prompt.slice(0,150), prompt_full_length: S.prompt.length });
 
     const editSize = getEditSize();
     log('🖼️ 开始图生图编辑','hl');
@@ -542,22 +837,12 @@
       log('📤 上传 ' + S.uploadedFiles.length + ' 张图片...','l');
       DOM.genBadge.textContent='上传中';
 
-      // Update monitor with request preview
-      const reqPreview = { prompt: S.prompt.slice(0,80), model: S.model, size: editSize, n: S.numOutputs, images: S.uploadedFiles.length };
-      DOM.monReq.textContent = JSON.stringify(reqPreview, null, 2);
-      DOM.monRes.textContent = '等待响应…';
-      DOM.monLive.className = 'mon-live active';
-      DOM.monResTag.className = 'mon-tag pending';
-      DOM.monResTag.textContent = '⏳ 处理中';
-
       const resp = await apiFormData('/api/edits', formData);
 
-      // Update monitor with response
-      DOM.monRes.textContent = JSON.stringify(resp.response_data || resp, null, 2);
-      DOM.monResTag.textContent = resp.success ? '✅ 完成' : '❌ 失败';
-      DOM.monLive.className = 'mon-live';
-      DOM.monLive.innerHTML = resp.success ? '● 请求完成' : '● 请求失败';
-      document.querySelectorAll('.tl-i').forEach(t => t.classList.add('done'));
+      // Update monitor
+      _monState.elapsed = resp.total_time || 0;
+      updateMonitorRes(resp.response_data || resp, resp.success);
+      updateProgSteps('done');
 
       if (resp.logs) resp.logs.split('\n').filter(Boolean).forEach(l => log(l, 'l'));
 
@@ -580,8 +865,7 @@
         DOM.btnRetry.style.display = 'inline-flex';
         // Show detailed error in monitor
         if (resp.error_detail) {
-          DOM.monReq.textContent = JSON.stringify(resp.error_detail.request || {}, null, 2);
-          DOM.monRes.textContent = JSON.stringify(resp.error_detail.response || {}, null, 2);
+          updateMonitorRes(resp.error_detail, false);
         }
       }
     } catch(e) {
@@ -601,33 +885,37 @@
         if (full.length>_knownLogLen) { full.substring(_knownLogLen).split('\n').filter(Boolean).forEach(l=>log(l,'l')); _knownLogLen=full.length; }
         DOM.genBadge.textContent='⏳ '+(data.status||'…');
         // 实时更新监控面板
-        const elapsed = ((Date.now()-t0)/1000).toFixed(1);
-        DOM.monLive.className='mon-live active';
-        DOM.monLive.innerHTML='<span class="pulse">●</span> ' + elapsed + 's';
-        if (data.response_data) DOM.monRes.textContent=JSON.stringify(data.response_data,null,2);
-        if (data.logs) DOM.monResTag.textContent='⏳ '+(data.status||'…');
+        const elapsed = (Date.now()-t0)/1000;
+        updateMonitorLive(elapsed);
+        if (data.response_data) {
+          _monState.resData = data.response_data;
+          DOM.monRes.textContent = JSON.stringify(data.response_data, null, 2);
+          DOM.monRes.style.display = '';
+          DOM.monResJsonTitle.style.display = '';
+        }
+        updateProgSteps(data.status === 'succeeded' ? 'done' : 'api');
         if (data._done) {
-          const sec=((Date.now()-t0)/1000).toFixed(1);
+          const sec = (elapsed).toFixed(1);
+          var steps = data.monitor_steps || [];
           if (data.status==='succeeded') {
             DOM.genBadge.textContent='✅ 完成'; DOM.genBadge.className='g-bdg done';
             DOM.genBar.className='g-fill'; DOM.genBar.style.width='100%';
             log('✅ 成功! '+sec+'s','ok');
-            updateMonitor(data.request_data,data.response_data);
+            // Init monitor with request data first
+            initMonitor(data.request_data || _monState.reqData || {});
+            updateMonitorSteps(steps);
+            updateMonitorRes(data.response_data || {}, true);
             const local=data.local_images||[],urls=data.output||[],imgs=[];
             if (local.length) local.forEach((p,i)=>imgs.push({local_path:p,url:urls[i]||''}));
             else if (urls.length) urls.forEach(u=>imgs.push({url:u}));
             if (imgs.length) { renderImgs(imgs); toast('生成 '+imgs.length+' 张','success'); DOM.btnDownloadAll.style.display='inline-flex'; }
-            S.historyPage=1; loadHistory(); finalizeMonitor(true);
+            S.historyPage=1; loadHistory(); finalizeMonitor(true,steps);
           } else {
             DOM.genBadge.textContent='❌ 失败'; DOM.genBadge.className='g-bdg fail';
             log('❌ '+(data.error||data.status||'失败'),'err');
-            // Show detailed error in monitor
-            if (data.error_detail) {
-              DOM.monReq.textContent = JSON.stringify(data.error_detail.request || {}, null, 2);
-              DOM.monRes.textContent = JSON.stringify(data.error_detail.response || {}, null, 2);
-            }
-            updateMonitor(data.request_data,data.response_data);
-            toast(data.error||'失败','error'); finalizeMonitor(false);
+            updateMonitorSteps(steps);
+            updateMonitorRes(data.response_data || { error: data.error }, false);
+            toast(data.error||'失败','error'); finalizeMonitor(false,steps);
           }
           finishGen(); return;
         }
@@ -765,16 +1053,12 @@
     DOM.btnClearMonitor.addEventListener('click', () => {
       DOM.monBody.style.display = 'none';
       DOM.monEmpty.style.display = '';
-      DOM.monReq.textContent = '暂无';
-      DOM.monRes.textContent = '暂无';
       DOM.monLive.className = 'mon-live';
       DOM.monLive.innerHTML = '● 等待请求';
-      DOM.monResTag.className = 'mon-tag';
-      DOM.monResTag.textContent = 'RECEIVED';
+      DOM.monTaskId.style.display = 'none';
+      DOM.monError.style.display = 'none';
       DOM.btnClearMonitor.style.display = 'none';
-      // Reset timeline
-      document.querySelectorAll('.tl-i').forEach(t => { t.classList.remove('active','done'); });
-      document.querySelector('.tl-i').classList.add('active');
+      _monState = { reqData: null, resData: null, steps: [], startTime: 0 };
     });
   }
 

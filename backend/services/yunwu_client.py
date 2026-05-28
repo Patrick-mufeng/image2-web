@@ -5,7 +5,9 @@
 """
 
 import asyncio
+import json as json_module
 import time
+import traceback
 import httpx
 from backend.config import settings
 
@@ -30,13 +32,30 @@ class YunwuClient:
     """云雾API 客户端"""
 
     def __init__(self):
-        self._timeout = 120.0
+        self._timeout = 500.0
 
     def _headers(self) -> dict:
         return {
             "Authorization": f"Bearer {settings.yunwu_api_key}",
             "Content-Type": "application/json",
         }
+
+    @staticmethod
+    def _safe_json(resp, req_info: dict) -> dict:
+        """安全解析 JSON 响应，失败时抛出 YunwuAPIError"""
+        resp_info = {
+            "status": resp.status_code,
+            "headers": dict(resp.headers),
+            "body": resp.text[:2000],
+        }
+        try:
+            return resp.json()
+        except (json_module.JSONDecodeError, ValueError) as e:
+            raise YunwuAPIError(
+                f"API 返回非 JSON 响应 ({resp.status_code}): {resp.text[:300]}",
+                request_info=req_info,
+                response_info=resp_info,
+            ) from e
 
     # ── OpenAI 格式：即时返回 ──────────────────────────────────────
 
@@ -60,22 +79,30 @@ class YunwuClient:
             "body": payload,
         }
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.post(url, headers=self._headers(), json=payload)
-            resp_info = {
-                "status": resp.status_code,
-                "headers": dict(resp.headers),
-                "body": resp.text[:2000],
-            }
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(url, headers=self._headers(), json=payload)
+        except httpx.TimeoutException as e:
+            raise YunwuAPIError(f"OpenAI 生图超时（超过 {self._timeout}s），请降低分辨率或重试", request_info=req_info) from e
+        except httpx.ConnectError as e:
+            raise YunwuAPIError(f"无法连接 API 服务器，请检查 Base URL 和网络", request_info=req_info) from e
+        except httpx.HTTPError as e:
+            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-            if resp.status_code != 200:
-                raise YunwuAPIError(
-                    f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}",
-                    request_info=req_info,
-                    response_info=resp_info,
-                )
+        resp_info = {
+            "status": resp.status_code,
+            "headers": dict(resp.headers),
+            "body": resp.text[:2000],
+        }
 
-            return resp.json()
+        if resp.status_code != 200:
+            raise YunwuAPIError(
+                f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}",
+                request_info=req_info,
+                response_info=resp_info,
+            )
+
+        return self._safe_json(resp, req_info)
 
     # ── Replicate 格式：异步任务 + 轮询 ────────────────────────────
 
@@ -102,17 +129,25 @@ class YunwuClient:
         url = f"{base_url}/replicate/v1/models/{model}/predictions"
         req_info = {"method": "POST", "url": url, "headers": {k: v[:50] for k, v in self._headers().items()}, "body": payload}
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.post(url, headers=self._headers(), json=payload)
-            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(url, headers=self._headers(), json=payload)
+        except httpx.TimeoutException as e:
+            raise YunwuAPIError(f"创建任务超时，请重试", request_info=req_info) from e
+        except httpx.ConnectError as e:
+            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+        except httpx.HTTPError as e:
+            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-            if resp.status_code not in (200, 201):
-                raise YunwuAPIError(
-                    f"创建任务失败 ({resp.status_code}): {resp.text[:500]}",
-                    request_info=req_info, response_info=resp_info,
-                )
+        resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
-            return resp.json()
+        if resp.status_code not in (200, 201):
+            raise YunwuAPIError(
+                f"创建任务失败 ({resp.status_code}): {resp.text[:500]}",
+                request_info=req_info, response_info=resp_info,
+            )
+
+        return self._safe_json(resp, req_info)
 
     async def get_prediction(self, task_id: str) -> dict:
         """查询 Replicate 格式预测任务状态"""
@@ -120,17 +155,25 @@ class YunwuClient:
         url = f"{base_url}/replicate/v1/predictions/{task_id}"
         req_info = {"method": "GET", "url": url}
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.get(url, headers=self._headers())
-            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(url, headers=self._headers())
+        except httpx.TimeoutException as e:
+            raise YunwuAPIError(f"查询任务超时", request_info=req_info) from e
+        except httpx.ConnectError as e:
+            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+        except httpx.HTTPError as e:
+            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-            if resp.status_code != 200:
-                raise YunwuAPIError(
-                    f"查询任务失败 ({resp.status_code}): {resp.text[:500]}",
-                    request_info=req_info, response_info=resp_info,
-                )
+        resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
-            return resp.json()
+        if resp.status_code != 200:
+            raise YunwuAPIError(
+                f"查询任务失败 ({resp.status_code}): {resp.text[:500]}",
+                request_info=req_info, response_info=resp_info,
+            )
+
+        return self._safe_json(resp, req_info)
 
     async def wait_for_completion(self, task_id: str, on_progress=None,
                                    poll_interval: float = 0.5) -> dict:
@@ -198,17 +241,25 @@ class YunwuClient:
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.post(url, headers=headers, files=files)
-            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(url, headers=headers, files=files)
+        except httpx.TimeoutException as e:
+            raise YunwuAPIError(f"图生图超时，请降低分辨率或重试", request_info=req_info) from e
+        except httpx.ConnectError as e:
+            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+        except httpx.HTTPError as e:
+            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-            if resp.status_code != 200:
-                raise YunwuAPIError(
-                    f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}",
-                    request_info=req_info, response_info=resp_info,
-                )
+        resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
-            return resp.json()
+        if resp.status_code != 200:
+            raise YunwuAPIError(
+                f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}",
+                request_info=req_info, response_info=resp_info,
+            )
+
+        return self._safe_json(resp, req_info)
 
     # ── OpenAI 格式：多图参考生成 (gpt-image-2-all) ──────────────
 
@@ -229,17 +280,25 @@ class YunwuClient:
         url = f"{base_url}/v1/images/generations"
         req_info = {"method": "POST", "url": url, "headers": {k: v[:50] for k, v in self._headers().items()}, "body": payload}
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.post(url, headers=self._headers(), json=payload)
-            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(url, headers=self._headers(), json=payload)
+        except httpx.TimeoutException as e:
+            raise YunwuAPIError(f"多图参考生成超时，请重试", request_info=req_info) from e
+        except httpx.ConnectError as e:
+            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+        except httpx.HTTPError as e:
+            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-            if resp.status_code != 200:
-                raise YunwuAPIError(
-                    f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}",
-                    request_info=req_info, response_info=resp_info,
-                )
+        resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
-            return resp.json()
+        if resp.status_code != 200:
+            raise YunwuAPIError(
+                f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}",
+                request_info=req_info, response_info=resp_info,
+            )
+
+        return self._safe_json(resp, req_info)
 
 
 # 全局单例

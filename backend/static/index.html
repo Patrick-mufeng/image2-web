@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>觅图 mitu — AI 图片生成</title>
-  <link rel="stylesheet" href="/css/style.css?v=9">
+  <link rel="stylesheet" href="/css/style.css?v=13">
 </head>
 <body>
   <div id="app">
@@ -372,36 +372,106 @@
           <div class="page">
             <div class="page-h">
               <h2 class="page-title">实时监控</h2>
-              <div style="display:flex;gap:6px;align-items:center">
+              <div style="display:flex;gap:8px;align-items:center">
                 <span class="mon-live" id="monLive">● 等待请求</span>
+                <span class="mon-taskid" id="monTaskId" style="display:none"></span>
                 <button class="btn btn-s btn-sm" id="btnClearMonitor" style="display:none">清空</button>
               </div>
             </div>
+
+            <!-- Empty state -->
             <div class="mon-empty" id="monEmpty">
-              <p>暂无请求记录。执行一次图片生成后，请求与响应的详细信息将实时显示。</p>
+              <div class="mon-empty-icon">📡</div>
+              <p>暂无请求记录</p>
+              <p class="mon-empty-sub">执行图片生成后，请求与响应的详细信息将在此实时显示</p>
             </div>
+
+            <!-- Active monitor -->
             <div class="mon-body" id="monBody" style="display:none">
+
+              <!-- History list -->
+              <div class="mon-p" id="monHistoryPanel">
+                <div class="mon-p-h">
+                  <span>📋 请求历史</span>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <span class="mon-tag" id="monHistoryCount">0 条</span>
+                    <button class="btn btn-s btn-sm" id="btnRefreshHistory" title="刷新">🔄</button>
+                  </div>
+                </div>
+                <div class="mon-history-list" id="monHistoryList">
+                  <p style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px">加载中...</p>
+                </div>
+              </div>
+
+              <!-- Status bar -->
+              <div class="mon-statusbar" id="monStatusBar">
+                <div class="mon-sb-left">
+                  <span class="mon-sb-status" id="monSbStatus">⏳ 处理中</span>
+                  <span class="mon-sb-sep">|</span>
+                  <span>耗时 <strong id="monSbElapsed">0.0s</strong></span>
+                  <span class="mon-sb-sep">|</span>
+                  <span>模型 <strong id="monSbModel">-</strong></span>
+                  <span class="mon-sb-sep">|</span>
+                  <span>尺寸 <strong id="monSbSize">-</strong></span>
+                </div>
+                <div class="mon-sb-right">
+                  <span id="monSbTag" class="mon-sb-tag running">处理中</span>
+                </div>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="mon-progress" id="monProgress">
+                <div class="mon-prog-bar">
+                  <div class="mon-prog-fill" id="monProgFill"></div>
+                </div>
+                <div class="mon-prog-steps" id="monProgSteps">
+                  <span class="mp-step active" data-step="send">📤 发送请求</span>
+                  <span class="mp-step" data-step="api">⚙ API 处理</span>
+                  <span class="mp-step" data-step="download">📥 下载图片</span>
+                  <span class="mp-step" data-step="done">✅ 完成</span>
+                </div>
+              </div>
+
+              <!-- Main panels -->
               <div class="mon-panels">
+                <!-- Left: Request -->
                 <div class="mon-p">
-                  <div class="mon-p-h">
-                    <span>📤 请求</span>
-                    <span class="mon-tag">REQUEST</span>
+                  <div class="mon-p-h"><span>📤 请求参数</span><span class="mon-tag">REQUEST</span></div>
+                  <div class="mon-p-body">
+                    <table class="mon-table" id="monReqTable"></table>
+                    <div class="mon-section-title">提示词</div>
+                    <pre class="mon-code mon-code-prompt" id="monReqPrompt"></pre>
                   </div>
-                  <pre class="mon-code" id="monReq">暂无</pre>
                 </div>
+
+                <!-- Right: Response -->
                 <div class="mon-p">
-                  <div class="mon-p-h">
-                    <span>📥 响应</span>
-                    <span class="mon-tag" id="monResTag">RECEIVED</span>
+                  <div class="mon-p-h"><span>📥 响应结果</span><span class="mon-tag" id="monResTag">--</span></div>
+                  <div class="mon-p-body">
+                    <table class="mon-table" id="monResTable"></table>
+                    <div class="mon-section-title" id="monResJsonTitle" style="display:none">原始响应 JSON</div>
+                    <pre class="mon-code" id="monRes" style="display:none"></pre>
                   </div>
-                  <pre class="mon-code" id="monRes">暂无</pre>
                 </div>
               </div>
-              <div class="mon-tl" id="monTimeline">
-                <div class="tl-i active"><span class="tl-d"></span><span>请求发送</span></div>
-                <div class="tl-i" id="tlProcess"><span class="tl-d"></span><span>处理中</span></div>
-                <div class="tl-i" id="tlDone"><span class="tl-d"></span><span>完成</span></div>
+
+              <!-- Step timeline -->
+              <div class="mon-p">
+                <div class="mon-p-h"><span>⏱ 分步耗时</span><span class="mon-tag">TIMELINE</span></div>
+                <div class="mon-p-body" id="monStepsBody">
+                  <p style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px">等待数据...</p>
+                </div>
               </div>
+
+              <!-- Error panel -->
+              <div class="mon-p mon-p-err" id="monError" style="display:none">
+                <div class="mon-p-h"><span>❌ 错误详情</span><span class="mon-tag" style="background:rgba(220,80,80,.1);color:var(--red)">ERROR</span></div>
+                <div class="mon-p-body">
+                  <div class="mon-err-msg" id="monErrMsg"></div>
+                  <pre class="mon-code mon-code-err" id="monErrTrace"></pre>
+                </div>
+              </div>
+
             </div>
           </div>
         </section>
@@ -483,6 +553,6 @@
     <img src="" alt="预览" id="lbImg">
   </div>
 
-  <script src="/js/app.js?v=9"></script>
+  <script src="/js/app.js?v=13"></script>
 </body>
 </html>
