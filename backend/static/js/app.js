@@ -13,7 +13,7 @@
     pageBaseUrl: $('pageBaseUrl'), pageApiKey: $('pageApiKey'),
     pageStatus: $('pageStatus'), pageSaveBtn: $('pageSaveBtn'),
     ratioGrid: $('ratioGrid'), resolutionSelect: $('resolutionSelect'),
-    modelSelect: $('modelSelect'), countGroup: $('countGroup'),
+    modelSelect: $('modelSelect'), groupSelect: $('groupSelect'), groupRate: $('groupRate'), countGroup: $('countGroup'),
     promptInput: $('promptInput'), charCount: $('charCount'),
     multiMode: $('multiMode'), multiHint: $('multiHint'),
     btnGenerate: $('btnGenerate'), btnCancel: $('btnCancel'),
@@ -46,7 +46,7 @@
   const S = {
     tab: 0,
     aspectRatio: '1:1', megapixels: '1', model: 'gpt-image-2',
-    numOutputs: 1, prompt: '', models: [],
+    numOutputs: 1, prompt: '', models: [], groups: [], selectedGroup: 'default',
     apiConfigured: false, userApiKey: '', userBaseUrl: '',
     isGenerating: false, multiMode: false,
     mode: 'txt2img',  // 'txt2img' | 'img2img'
@@ -185,15 +185,49 @@
     });
   }
 
-  // ── Tab 1: Models ──
+  // ── Tab 1: Groups ──
+  function renderGroups() {
+    DOM.groupSelect.innerHTML = '';
+    if (!S.groups.length) {
+      const o = document.createElement('option'); o.value = 'default'; o.textContent = 'default 默认';
+      DOM.groupSelect.appendChild(o); return;
+    }
+    S.groups.forEach(g => {
+      const o = document.createElement('option'); o.value = g.value; o.textContent = g.label;
+      if (g.value === S.selectedGroup) o.selected = true;
+      DOM.groupSelect.appendChild(o);
+    });
+    updGroupRate();
+  }
+
+  function updGroupRate() {
+    const g = S.groups.find(x => x.value === S.selectedGroup);
+    if (g && g.rate) {
+      DOM.groupRate.textContent = '×' + g.rate;
+      DOM.groupRate.title = g.desc || '';
+    } else {
+      DOM.groupRate.textContent = '';
+      DOM.groupRate.title = '';
+    }
+  }
+
+  // ── Tab 1: Models (filtered by group) ──
   function renderModels() {
     DOM.modelSelect.innerHTML = '';
     if (!S.models.length) {
       const o = document.createElement('option'); o.value = 'gpt-image-2'; o.textContent = 'GPT Image 2';
       DOM.modelSelect.appendChild(o); return;
     }
+    // Filter models by selected group using supported_groups
+    const filtered = S.selectedGroup
+      ? S.models.filter(m => !m.supported_groups || m.supported_groups.includes(S.selectedGroup))
+      : S.models;
+    if (!filtered.length) {
+      const o = document.createElement('option'); o.value = ''; o.textContent = '⚠️ 当前分组无可用模型';
+      DOM.modelSelect.appendChild(o); return;
+    }
     const groups = {};
-    S.models.forEach(m => { const g = m.group||'其他'; if(!groups[g]) groups[g]=[]; groups[g].push(m); });
+    filtered.forEach(m => { const g = m.group||'其他'; if(!groups[g]) groups[g]=[]; groups[g].push(m); });
     Object.keys(groups).forEach(gName => {
       const grp = document.createElement('optgroup'); grp.label = gName;
       groups[gName].forEach(m => {
@@ -203,6 +237,11 @@
       });
       DOM.modelSelect.appendChild(grp);
     });
+    // If current model not in filtered list, switch to first available
+    if (S.model && !filtered.find(m => m.value === S.model)) {
+      S.model = filtered[0].value;
+      DOM.modelSelect.value = S.model;
+    }
   }
 
   // ── Tab 1: Helpers ──
@@ -1080,6 +1119,12 @@
 
   // ── Events ──
   DOM.resolutionSelect.addEventListener('change',()=>{S.megapixels=DOM.resolutionSelect.value;});
+  DOM.groupSelect.addEventListener('change',()=>{
+    S.selectedGroup = DOM.groupSelect.value;
+    updGroupRate();
+    renderModels();
+    localStorage.setItem('mitu_selected_group', S.selectedGroup);
+  });
   DOM.modelSelect.addEventListener('change',()=>{S.model=DOM.modelSelect.value;});
   DOM.countGroup.addEventListener('click',e=>{const b=e.target.closest('.p-btn');if(!b)return;S.numOutputs=+b.dataset.count;DOM.countGroup.querySelectorAll('.p-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');});
   if(DOM.multiMode){DOM.multiMode.addEventListener('change',()=>{S.multiMode=DOM.multiMode.checked;updMultiHint();});}
@@ -1680,12 +1725,18 @@
   (async function init() {
     renderRatios();
     try {
-      const [s1,s2,s3]=await Promise.all([api('GET','/api/config/status'),api('GET','/api/config/settings'),api('GET','/api/config/models')]);
+      const [s1,s2,s3,s4]=await Promise.all([api('GET','/api/config/status'),api('GET','/api/config/settings'),api('GET','/api/config/models'),api('GET','/api/config/groups')]);
       S.apiConfigured=s1.api_configured||false;
       if(s2){S.userApiKey=s2.api_key||'';S.userBaseUrl=s2.base_url||'';}
       S.models=(s3&&s3.models)?s3.models:[];
+      S.groups=(s4&&s4.groups)?s4.groups:[];
     } catch(e){console.error('Init:',e);}
-    renderModels(); updStatus(); renderSettings(); updBtn(); loadHistory();
+    // Restore saved group preference
+    const savedGroup = localStorage.getItem('mitu_selected_group');
+    if (savedGroup && S.groups.some(g => g.value === savedGroup)) {
+      S.selectedGroup = savedGroup;
+    }
+    renderGroups(); renderModels(); updStatus(); renderSettings(); updBtn(); loadHistory();
 
     // Load templates
     await loadTemplates();
