@@ -12,7 +12,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from backend.config import settings
-from backend.services.yunwu_client import yunwu_client, YunwuAPIError
+from backend.services.openlux_client import openlux_client, OpenLuxAPIError
 from backend.services.history_store import history_store
 from backend.routers.config_routes import is_replicate_model, resolve_size
 
@@ -38,7 +38,7 @@ async def edit_image(
     t0 = time.time()
 
     # 检查 API Key
-    if not settings.yunwu_api_key or settings.yunwu_api_key == "sk-your-api-key-here":
+    if not settings.openlux_api_key or settings.openlux_api_key == "sk-your-api-key-here":
         return {
             "success": False,
             "error": "请先配置 API Key（点击右上角齿轮图标）",
@@ -81,7 +81,7 @@ async def edit_image(
         for img_idx, (img_filename, img_data) in enumerate(image_datas):
             if len(image_datas) > 1:
                 logs += f"[{_ts()}] 📤 处理图片 {img_idx+1}/{len(image_datas)}: {img_filename}\n"
-            result = await yunwu_client.edit_image(
+            result = await openlux_client.edit_image(
                 image_data=img_data,
                 prompt=prompt,
                 filename=img_filename,
@@ -170,7 +170,7 @@ async def edit_image(
             "total_time": elapsed,
         }
 
-    except YunwuAPIError as e:
+    except OpenLuxAPIError as e:
         error_log = logs + f"[{_ts()}] ❌ API错误: {str(e)}\n"
         err_detail = e.to_dict() if hasattr(e, 'to_dict') else {"error": str(e)}
         from backend.services.log_store import log_store

@@ -1,7 +1,7 @@
-"""云雾API 异步 HTTP 客户端
+"""OpenLux API 异步 HTTP 客户端
 支持两种格式:
   1. OpenAI 兼容格式: POST /v1/images/generations — 即时返回
-  2. Replicate 格式:   POST /replicate/v1/models/{model}/predictions — 异步任务 + 轮询
+  2. Replicate 格式:   POST /replicate/v1/models/{model}/predictions — 异步任务 + 轮询（预留）
 """
 
 import asyncio
@@ -12,7 +12,7 @@ import httpx
 from backend.config import settings
 
 
-class YunwuAPIError(Exception):
+class OpenLuxAPIError(Exception):
     """上游 API 错误，携带完整请求/响应信息"""
 
     def __init__(self, message: str, request_info: dict = None, response_info: dict = None):
@@ -28,21 +28,29 @@ class YunwuAPIError(Exception):
         }
 
 
-class YunwuClient:
-    """云雾API 客户端"""
+class OpenLuxClient:
+    """OpenLux API 客户端"""
 
     def __init__(self):
         self._timeout = 500.0
 
+    @staticmethod
+    def _normalize_base() -> str:
+        """规范化 Base URL：去尾部斜杠；旧配置可能带 /v1 后缀，去掉避免拼出 /v1/v1/..."""
+        base = settings.openlux_base_url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3]
+        return base
+
     def _headers(self) -> dict:
         return {
-            "Authorization": f"Bearer {settings.yunwu_api_key}",
+            "Authorization": f"Bearer {settings.openlux_api_key}",
             "Content-Type": "application/json",
         }
 
     @staticmethod
     def _safe_json(resp, req_info: dict) -> dict:
-        """安全解析 JSON 响应，失败时抛出 YunwuAPIError"""
+        """安全解析 JSON 响应，失败时抛出 OpenLuxAPIError"""
         resp_info = {
             "status": resp.status_code,
             "headers": dict(resp.headers),
@@ -51,7 +59,7 @@ class YunwuClient:
         try:
             return resp.json()
         except (json_module.JSONDecodeError, ValueError) as e:
-            raise YunwuAPIError(
+            raise OpenLuxAPIError(
                 f"API 返回非 JSON 响应 ({resp.status_code}): {resp.text[:300]}",
                 request_info=req_info,
                 response_info=resp_info,
@@ -61,8 +69,9 @@ class YunwuClient:
 
     async def openai_generate(self, prompt: str, model: str = "gpt-image-2",
                                size: str = "1024x1024", n: int = 1) -> dict:
-        """调用 OpenAI 兼容的 /v1/images/generations 接口（即时返回）"""
-        base_url = settings.yunwu_base_url.rstrip("/")
+        """调用 OpenAI 兼容的 /v1/images/generations 接口（即时返回）
+        上游可能返回 429「系统繁忙」，自动退避重试（5s / 10s / 20s）"""
+        base_url = self._normalize_base()
 
         payload = {
             "model": model,
@@ -79,32 +88,42 @@ class YunwuClient:
             "body": payload,
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.post(url, headers=self._headers(), json=payload)
-        except httpx.TimeoutException as e:
-            raise YunwuAPIError(f"OpenAI 生图超时（超过 {self._timeout}s），请降低分辨率或重试", request_info=req_info) from e
-        except httpx.ConnectError as e:
-            raise YunwuAPIError(f"无法连接 API 服务器，请检查 Base URL 和网络", request_info=req_info) from e
-        except httpx.HTTPError as e:
-            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
+        max_retries = 3  # 429 上游繁忙时的自动重试次数
+        retried = 0
 
-        resp_info = {
-            "status": resp.status_code,
-            "headers": dict(resp.headers),
-            "body": resp.text[:2000],
-        }
+        for attempt in range(max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    resp = await client.post(url, headers=self._headers(), json=payload)
+            except httpx.TimeoutException as e:
+                raise OpenLuxAPIError(f"OpenAI 生图超时（超过 {self._timeout}s），请降低分辨率或重试", request_info=req_info) from e
+            except httpx.ConnectError as e:
+                raise OpenLuxAPIError(f"无法连接 API 服务器，请检查 Base URL 和网络", request_info=req_info) from e
+            except httpx.HTTPError as e:
+                raise OpenLuxAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-        if resp.status_code != 200:
-            raise YunwuAPIError(
-                f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}",
-                request_info=req_info,
-                response_info=resp_info,
-            )
+            resp_info = {
+                "status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body": resp.text[:2000],
+            }
 
-        return self._safe_json(resp, req_info)
+            if resp.status_code == 429 and attempt < max_retries:
+                retried += 1
+                await asyncio.sleep(5 * (2 ** attempt))  # 5s / 10s / 20s
+                continue
 
-    # ── Replicate 格式：异步任务 + 轮询 ────────────────────────────
+            if resp.status_code != 200:
+                busy_hint = "（上游繁忙，已自动重试 %d 次，请稍后再试）" % retried if resp.status_code == 429 else ""
+                raise OpenLuxAPIError(
+                    f"OpenAI 生图失败 ({resp.status_code}): {resp.text[:500]}{busy_hint}",
+                    request_info=req_info,
+                    response_info=resp_info,
+                )
+
+            return self._safe_json(resp, req_info)
+
+    # ── Replicate 格式：异步任务 + 轮询（预留，当前无模型走此通道） ──
 
     async def create_prediction(self, prompt: str, aspect_ratio: str = "1:1",
                                  megapixels: str = "1", num_outputs: int = 1,
@@ -112,7 +131,7 @@ class YunwuClient:
                                  num_inference_steps: int = 4,
                                  model: str = "black-forest-labs/flux-schnell") -> dict:
         """创建 Replicate 格式预测任务"""
-        base_url = settings.yunwu_base_url.rstrip("/")
+        base_url = self._normalize_base()
 
         payload = {
             "input": {
@@ -133,16 +152,16 @@ class YunwuClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(url, headers=self._headers(), json=payload)
         except httpx.TimeoutException as e:
-            raise YunwuAPIError(f"创建任务超时，请重试", request_info=req_info) from e
+            raise OpenLuxAPIError(f"创建任务超时，请重试", request_info=req_info) from e
         except httpx.ConnectError as e:
-            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+            raise OpenLuxAPIError(f"无法连接 API 服务器", request_info=req_info) from e
         except httpx.HTTPError as e:
-            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
+            raise OpenLuxAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
         resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
         if resp.status_code not in (200, 201):
-            raise YunwuAPIError(
+            raise OpenLuxAPIError(
                 f"创建任务失败 ({resp.status_code}): {resp.text[:500]}",
                 request_info=req_info, response_info=resp_info,
             )
@@ -151,7 +170,7 @@ class YunwuClient:
 
     async def get_prediction(self, task_id: str) -> dict:
         """查询 Replicate 格式预测任务状态"""
-        base_url = settings.yunwu_base_url.rstrip("/")
+        base_url = self._normalize_base()
         url = f"{base_url}/replicate/v1/predictions/{task_id}"
         req_info = {"method": "GET", "url": url}
 
@@ -159,16 +178,16 @@ class YunwuClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.get(url, headers=self._headers())
         except httpx.TimeoutException as e:
-            raise YunwuAPIError(f"查询任务超时", request_info=req_info) from e
+            raise OpenLuxAPIError(f"查询任务超时", request_info=req_info) from e
         except httpx.ConnectError as e:
-            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+            raise OpenLuxAPIError(f"无法连接 API 服务器", request_info=req_info) from e
         except httpx.HTTPError as e:
-            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
+            raise OpenLuxAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
         resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
         if resp.status_code != 200:
-            raise YunwuAPIError(
+            raise OpenLuxAPIError(
                 f"查询任务失败 ({resp.status_code}): {resp.text[:500]}",
                 request_info=req_info, response_info=resp_info,
             )
@@ -196,7 +215,7 @@ class YunwuClient:
                 return data
 
             if time.time() - t0 > 300:
-                raise YunwuAPIError("任务超时 (5分钟)")
+                raise OpenLuxAPIError("任务超时 (5分钟)")
 
             await asyncio.sleep(poll_interval)
 
@@ -212,8 +231,9 @@ class YunwuClient:
                           size: str = "1024x1024",
                           quality: str = "auto",
                           background: str = "auto") -> dict:
-        """调用 OpenAI 兼容的 /v1/images/edits 接口（multipart 上传）"""
-        base_url = settings.yunwu_base_url.rstrip("/")
+        """调用 OpenAI 兼容的 /v1/images/edits 接口（multipart 上传）
+        上游可能返回 429「系统繁忙」，自动退避重试（5s / 10s / 20s）"""
+        base_url = self._normalize_base()
         url = f"{base_url}/v1/images/edits"
 
         req_info = {
@@ -237,29 +257,39 @@ class YunwuClient:
             req_info["body"]["mask_size"] = len(mask_data)
 
         headers = {
-            "Authorization": f"Bearer {settings.yunwu_api_key}",
+            "Authorization": f"Bearer {settings.openlux_api_key}",
             "Accept": "application/json",
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.post(url, headers=headers, files=files)
-        except httpx.TimeoutException as e:
-            raise YunwuAPIError(f"图生图超时，请降低分辨率或重试", request_info=req_info) from e
-        except httpx.ConnectError as e:
-            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
-        except httpx.HTTPError as e:
-            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
+        max_retries = 3  # 429 上游繁忙时的自动重试次数
+        retried = 0
 
-        resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
+        for attempt in range(max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    resp = await client.post(url, headers=headers, files=files)
+            except httpx.TimeoutException as e:
+                raise OpenLuxAPIError(f"图生图超时，请降低分辨率或重试", request_info=req_info) from e
+            except httpx.ConnectError as e:
+                raise OpenLuxAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+            except httpx.HTTPError as e:
+                raise OpenLuxAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
-        if resp.status_code != 200:
-            raise YunwuAPIError(
-                f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}",
-                request_info=req_info, response_info=resp_info,
-            )
+            resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
-        return self._safe_json(resp, req_info)
+            if resp.status_code == 429 and attempt < max_retries:
+                retried += 1
+                await asyncio.sleep(5 * (2 ** attempt))  # 5s / 10s / 20s
+                continue
+
+            if resp.status_code != 200:
+                busy_hint = "（上游繁忙，已自动重试 %d 次，请稍后再试）" % retried if resp.status_code == 429 else ""
+                raise OpenLuxAPIError(
+                    f"图生图编辑失败 ({resp.status_code}): {resp.text[:500]}{busy_hint}",
+                    request_info=req_info, response_info=resp_info,
+                )
+
+            return self._safe_json(resp, req_info)
 
     # ── OpenAI 格式：多图参考生成 (gpt-image-2-all) ──────────────
 
@@ -267,7 +297,7 @@ class YunwuClient:
                                   model: str = "gpt-image-2-all",
                                   size: str = "1024x1024", n: int = 1) -> dict:
         """调用 gpt-image-2-all 多图参考生成接口"""
-        base_url = settings.yunwu_base_url.rstrip("/")
+        base_url = self._normalize_base()
 
         payload = {
             "model": model,
@@ -284,16 +314,16 @@ class YunwuClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(url, headers=self._headers(), json=payload)
         except httpx.TimeoutException as e:
-            raise YunwuAPIError(f"多图参考生成超时，请重试", request_info=req_info) from e
+            raise OpenLuxAPIError(f"多图参考生成超时，请重试", request_info=req_info) from e
         except httpx.ConnectError as e:
-            raise YunwuAPIError(f"无法连接 API 服务器", request_info=req_info) from e
+            raise OpenLuxAPIError(f"无法连接 API 服务器", request_info=req_info) from e
         except httpx.HTTPError as e:
-            raise YunwuAPIError(f"网络请求异常: {e}", request_info=req_info) from e
+            raise OpenLuxAPIError(f"网络请求异常: {e}", request_info=req_info) from e
 
         resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
 
         if resp.status_code != 200:
-            raise YunwuAPIError(
+            raise OpenLuxAPIError(
                 f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}",
                 request_info=req_info, response_info=resp_info,
             )
@@ -302,4 +332,4 @@ class YunwuClient:
 
 
 # 全局单例
-yunwu_client = YunwuClient()
+openlux_client = OpenLuxClient()

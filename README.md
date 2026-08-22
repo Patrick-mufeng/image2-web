@@ -15,10 +15,10 @@
 2. **配置 API Key**
    编辑 `.env` 文件，填入你的 API Key：
    ```
-   YUNWU_API_KEY=sk-your-api-key-here
-   YUNWU_BASE_URL=https://yunwu.ai
+   OPENLUX_API_KEY=sk-your-api-key-here
+   OPENLUX_BASE_URL=https://api.openlux.ai
    ```
-   > 注册获取 API Key：[云雾 API](https://yunwu.ai/register?aff=zM1f)
+   > 注册获取 API Key：[OpenLux](https://doc.openlux.ai)
 
 3. **启动服务**
    双击 `start.bat` 即可启动，浏览器自动打开 `http://localhost:8000`
@@ -30,8 +30,7 @@
 ## 功能特性
 
 ### 🎨 图片生成
-- 支持 OpenAI 格式（gpt-image-2 / gpt-image-1 / DALL-E 3 等）
-- 支持 Replicate 格式（FLUX Schnell / Dev / Pro）
+- 支持 OpenAI 格式（gpt-image-2 / gpt-image-2-c / gpt-image-1 / DALL-E 3）
 - 5 种比例：1:1、16:9、9:16、4:3、3:4
 - 3 级分辨率：1MP / 2MP / 4MP
 - 独立提示词模式（每行各生成一张图）
@@ -42,7 +41,7 @@
 - 拖拽上传图片进行 AI 编辑
 - 支持单图/多图编辑
 - 可选蒙版上传（PNG 格式）
-- 支持 gpt-image-2 / gpt-image-2-all 等模型
+- 支持 gpt-image-2 / gpt-image-1 等模型
 
 ### 📜 生成历史
 - 自动保存所有生成记录
@@ -104,7 +103,7 @@ image2-web/
 │   │   ├── templates.py     # 风格模板
 │   │   └── config_routes.py # 配置+余额查询
 │   ├── services/            # 业务逻辑
-│   │   ├── yunwu_client.py  # 云雾 API 客户端
+│   │   ├── openlux_client.py # OpenLux API 客户端
 │   │   ├── task_manager.py  # 异步任务管理
 │   │   ├── history_store.py # 历史存储
 │   │   ├── log_store.py     # 日志存储
@@ -134,7 +133,7 @@ image2-web/
 
 ## 版本
 
-V3.0
+V3.1
 
 ---
 

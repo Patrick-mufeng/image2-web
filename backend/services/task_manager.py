@@ -9,7 +9,7 @@ import traceback
 from datetime import datetime
 
 from backend.config import settings
-from backend.services.yunwu_client import yunwu_client, YunwuAPIError
+from backend.services.openlux_client import openlux_client, OpenLuxAPIError
 from backend.services.image_utils import download_image as _download_image
 
 
@@ -82,7 +82,7 @@ class TaskManager:
         try:
             # 1. 创建任务
             self.append_log(task_id, f"[{_ts()}] 请求中...")
-            prediction = await yunwu_client.create_prediction(
+            prediction = await openlux_client.create_prediction(
                 prompt=prompt, aspect_ratio=aspect_ratio,
                 megapixels=megapixels, num_outputs=num_outputs,
                 output_format=output_format, output_quality=output_quality,
@@ -106,7 +106,7 @@ class TaskManager:
             last_log_len = 0
 
             while True:
-                data = await yunwu_client.get_prediction(rid)
+                data = await openlux_client.get_prediction(rid)
                 status = data.get("status", "")
 
                 # 追加新增日志
@@ -137,7 +137,7 @@ class TaskManager:
 
                 await asyncio.sleep(0.8)
 
-        except YunwuAPIError as e:
+        except OpenLuxAPIError as e:
             self.append_log(task_id, f"[{_ts()}] ❌ API错误: {str(e)}")
             self._update(task_id, {"status": "failed", "error": str(e), "_done": True,
                                    "request_data": request_data})

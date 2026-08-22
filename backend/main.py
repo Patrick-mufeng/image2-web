@@ -22,8 +22,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Image2 图片生成工具",
-    description="基于云雾API Replicate 格式的 AI 图片生成工具",
-    version="2.0.0",
+    description="基于 OpenLux API（OpenAI 兼容格式）的 AI 图片生成工具",
+    version="3.1.0",
     lifespan=lifespan,
 )
 

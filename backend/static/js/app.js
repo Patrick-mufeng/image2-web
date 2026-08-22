@@ -110,7 +110,7 @@
     DOM.pageStatus.innerHTML = S.apiConfigured
       ? '<span class="bdg ok">✅ 已连接</span>'
       : '<span class="bdg miss">❌ 未配置</span>';
-    DOM.pageBaseUrl.value = S.userBaseUrl || 'https://yunwu.ai';
+    DOM.pageBaseUrl.value = S.userBaseUrl || 'https://api.openlux.ai';
     DOM.pageApiKey.value = S.userApiKey || '';
   }
   DOM.pageSaveBtn.addEventListener('click', async () => {

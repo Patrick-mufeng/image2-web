@@ -15,7 +15,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from backend.config import settings
 from backend.models import GenerateRequest, GenerateResponse, ImageInfo
-from backend.services.yunwu_client import yunwu_client, YunwuAPIError
+from backend.services.openlux_client import openlux_client, OpenLuxAPIError
 from backend.services.log_store import log_store
 from backend.services.history_store import history_store
 from backend.services.task_manager import task_manager
@@ -35,7 +35,7 @@ async def generate_image(request: GenerateRequest):
     t0 = time.time()
 
     # 检查 API Key
-    if not settings.yunwu_api_key or settings.yunwu_api_key == "sk-your-api-key-here":
+    if not settings.openlux_api_key or settings.openlux_api_key == "sk-your-api-key-here":
         return GenerateResponse(
             success=False,
             error="请先配置 API Key（点击右上角齿轮图标）",
@@ -137,7 +137,7 @@ async def generate_image(request: GenerateRequest):
             task_manager.append_log(task_id, f"[{ts()}] 📤 发送请求到 API...")
             monitor_steps.append({"step": "API 请求发送", "time": ts(), "elapsed": round(t_api_start - t0, 2)})
 
-            result = await yunwu_client.openai_generate(
+            result = await openlux_client.openai_generate(
                 prompt=request.prompt, model=request.model,
                 size=size, n=request.num_outputs,
             )
@@ -237,7 +237,7 @@ async def generate_image(request: GenerateRequest):
                 total_time=elapsed,
             )
 
-        except YunwuAPIError as e:
+        except OpenLuxAPIError as e:
             err_detail = e.to_dict() if hasattr(e, 'to_dict') else {"error": str(e)}
             full_err = str(e)
             err_log = logs + f"[{ts()}] ❌ API错误: {full_err}\n"
@@ -299,7 +299,7 @@ async def get_task_status(task_id: str):
 
     # 不在内存中 → 尝试查 Replicate API 原始状态（兼容旧任务）
     try:
-        data = await yunwu_client.get_prediction(task_id)
+        data = await openlux_client.get_prediction(task_id)
         return {
             "task_id": task_id,
             "status": data.get("status", "unknown"),
@@ -310,7 +310,7 @@ async def get_task_status(task_id: str):
             "response_data": data,
             "_done": data.get("status") in ("succeeded", "failed", "canceled"),
         }
-    except YunwuAPIError:
+    except OpenLuxAPIError:
         return {"task_id": task_id, "status": "unknown", "logs": "任务不存在", "_done": True}
     except Exception:
         return {"task_id": task_id, "status": "unknown", "logs": "查询失败", "_done": True}

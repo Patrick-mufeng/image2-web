@@ -23,59 +23,39 @@ RESOLUTION_OPTIONS = [
     {"value": "4", "label": "4K (~4MP)", "desc": "超清画质"},
 ]
 
-# 模型分组列表 — group 用于前端 optgroup
+# 模型列表 — group 用于前端 optgroup
 # supported_groups 标注该模型在哪些分组下可用
+# 来源：OpenLux GET /v1/models 实测（图片相关模型），2026-08
 AVAILABLE_MODELS = [
-    # OpenAI 格式模型组
     {"value": "gpt-image-2", "label": "GPT Image 2 (推荐)", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "official-openai", "premium-openai"]},
+     "supported_groups": ["default", "Gpt-Image-2", "Gpt-Image-1"]},
+    {"value": "gpt-image-2-c", "label": "GPT Image 2-C", "group": "✨ OpenAI 格式 · 即时返回",
+     "supported_groups": ["default", "Gpt-Image-2"]},
     {"value": "gpt-image-1", "label": "GPT Image 1", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "official-openai", "premium-openai"]},
-    {"value": "gpt-image-1.5", "label": "GPT Image 1.5", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "official-openai", "premium-openai"]},
-    {"value": "gpt-image-2-all", "label": "GPT Image 2 All (多图输入)", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "official-openai", "premium-openai"]},
+     "supported_groups": ["default", "Gpt-Image-1"]},
     {"value": "dall-e-3", "label": "DALL-E 3", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "official-openai", "premium-openai"]},
-    {"value": "grok-3-image", "label": "Grok 3 Image", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "trial", "premium-grok"]},
-    {"value": "doubao-seedream-4-0-250828", "label": "Doubao Seedream 4.0", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "enterprise", "sale"]},
-    {"value": "qwen-image-max", "label": "Qwen Image Max", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "enterprise", "sale"]},
-    {"value": "qwen-image-turbo", "label": "Qwen Image Turbo", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "az", "official", "enterprise", "sale"]},
-    # Replicate 格式模型组
-    {"value": "black-forest-labs/flux-schnell", "label": "FLUX Schnell (快速)", "group": "⚡ Replicate 格式 · 异步轮询",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "enterprise", "premium-grok", "premium-gemini", "official-gemini", "official-openai", "premium-openai", "official-claude2", "official-claude3", "direct-claude", "claude-code"]},
-    {"value": "black-forest-labs/flux-dev", "label": "FLUX Dev (高质量)", "group": "⚡ Replicate 格式 · 异步轮询",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "enterprise", "premium-grok", "premium-gemini", "official-gemini", "official-openai", "premium-openai", "official-claude2", "official-claude3", "direct-claude", "claude-code"]},
-    {"value": "black-forest-labs/flux-pro", "label": "FLUX Pro (专业)", "group": "⚡ Replicate 格式 · 异步轮询",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "enterprise", "premium-grok", "premium-gemini", "official-gemini", "official-openai", "premium-openai", "official-claude2", "official-claude3", "direct-claude", "claude-code"]},
-    {"value": "flux-kontext-pro", "label": "Flux Kontext Pro", "group": "⚡ Replicate 格式 · 异步轮询",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "enterprise", "premium-grok", "premium-gemini", "official-gemini", "official-openai", "premium-openai", "official-claude2", "official-claude3", "direct-claude", "claude-code"]},
-    {"value": "flux-kontext-max", "label": "Flux Kontext Max", "group": "⚡ Replicate 格式 · 异步轮询",
-     "supported_groups": ["default", "az", "official", "trial", "sale", "enterprise", "premium-grok", "premium-gemini", "official-gemini", "official-openai", "premium-openai", "official-claude2", "official-claude3", "direct-claude", "claude-code"]},
+     "supported_groups": ["default", "Gpt-Image-1"]},
 ]
 
-# ── 分组定义（15个分组，来源：云雾API 中转站）─────────────────
-# 每个分组标注费率、简介、支持的模型类型
+# ── 分组定义（16个分组，来源：OpenLux 官方分组参考）───────────────
+# 计费 = 模型原价 × 分组倍率（rate）；分组仅用于 UI 过滤与费率展示
 GROUP_DEFINITIONS = [
-    {"value": "default",     "label": "default 默认",          "rate": 1.0,  "desc": "混合ChatGPT(AZ)+Claude+MJ+国产",     "types": ["openai","claude","domestic","grok","gemini","mj"]},
-    {"value": "az",           "label": "纯AZ",                  "rate": 1.5,  "desc": "ChatGPT(AZ渠道)+ 国产(豆包+DeepSeek)",   "types": ["openai","domestic"]},
-    {"value": "official",     "label": "官转",                  "rate": 3.0,  "desc": "ChatGPT(AZ+官转)+国产,先AZ后官转",        "types": ["openai","domestic"]},
-    {"value": "trial",        "label": "限时体验",              "rate": 1.4,  "desc": "GPT+Claude+Gemini+Grok",                "types": ["openai","claude","gemini","grok"]},
-    {"value": "sale",         "label": "限时特价",              "rate": 0.6,  "desc": "国产(DeepSeek+Qwen)+Gemini+ChatGPT(AZ)",   "types": ["openai","gemini","domestic"]},
-    {"value": "enterprise",   "label": "企业级高可用大模型",    "rate": 1.0,  "desc": "国产模型(DeepSeek+Qwen)",                "types": ["domestic"]},
-    {"value": "premium-grok", "label": "优质grok",              "rate": 5.0,  "desc": "grok模型(部分)",                         "types": ["grok"]},
-    {"value": "premium-gemini","label":"优质gemini",            "rate": 1.0,  "desc": "Gemini(Google渠道)",                    "types": ["gemini"]},
-    {"value": "official-gemini","label":"官转gemini",           "rate": 3.0,  "desc": "Gemini(Google渠道),账号更多成本更高",      "types": ["gemini"]},
-    {"value": "official-openai","label":"官转OPENAI",           "rate": 6.0,  "desc": "ChatGPT(官转渠道)+AZ垫底",               "types": ["openai"]},
-    {"value": "premium-openai","label":"优质官转OPENAI",        "rate": 8.0,  "desc": "ChatGPT(官转渠道),账号更多更稳定",          "types": ["openai"]},
-    {"value": "official-claude2","label":"官转克劳德2",         "rate": 6.0,  "desc": "Claude(AWS官转渠道)",                   "types": ["claude"]},
-    {"value": "official-claude3","label":"官转克劳德3",         "rate": 12.0, "desc": "Claude(AWS官转+Anthropic官转)",          "types": ["claude"]},
-    {"value": "direct-claude","label":"直连克劳德",              "rate": 16.0, "desc": "Claude(Anthropic官转渠道)",             "types": ["claude"]},
-    {"value": "claude-code",  "label": "Claude code专属",       "rate": 1.5,  "desc": "Claude Code专用",                        "types": ["claude_code"]},
+    {"value": "default",     "label": "default 默认",       "rate": 0.07353, "desc": "OpenLux 默认分组，支持 GPT/Claude/图片等全模型", "types": ["openai","image"]},
+    {"value": "Gpt-Image-1", "label": "GPT Image 1",        "rate": 0.07353, "desc": "GPT-Image 官方网站资源",                  "types": ["image"]},
+    {"value": "Gpt-Image-2", "label": "GPT Image 2",        "rate": 0.09192, "desc": "GPT-Image-2（Adobe 资源）",                 "types": ["image"]},
+    {"value": "Doubao-1",    "label": "豆包 1",              "rate": 0.07353, "desc": "豆包/国产模型（自建资源）",               "types": ["image","openai"]},
+    {"value": "Doubao-2",    "label": "豆包 2",              "rate": 0.1103,  "desc": "豆包/国产模型",                            "types": ["image","openai"]},
+    {"value": "Doubao-3",    "label": "豆包 3",              "rate": 0.22059, "desc": "豆包/国产模型（高倍率）",                 "types": ["image","openai"]},
+    {"value": "Wenxin-1",    "label": "文心 1",              "rate": 0.07353, "desc": "文心一言（官方资源）",                    "types": ["image","openai"]},
+    {"value": "Wenxin-2",    "label": "文心 2",              "rate": 0.1103,  "desc": "文心一言",                               "types": ["image","openai"]},
+    {"value": "Wenxin-3",    "label": "文心 3",              "rate": 0.22059, "desc": "文心一言（高倍率）",                     "types": ["image","openai"]},
+    {"value": "Pix-1",       "label": "Pix 即梦",            "rate": 0.07353, "desc": "Pix 资源",                               "types": ["image","video"]},
+    {"value": "MJ-1",        "label": "Midjourney Slow",     "rate": 0.04412, "desc": "MJ Slow 慢速出图",                        "types": ["image"]},
+    {"value": "MJ-2",        "label": "Midjourney Fast",     "rate": 0.07353, "desc": "MJ Fast 快速出图",                        "types": ["image"]},
+    {"value": "Kling-1",     "label": "可灵 1",              "rate": 0.05147, "desc": "可灵 Kling（腾讯资源）",                    "types": ["image","video"]},
+    {"value": "Kling-2",     "label": "可灵 2",              "rate": 0.07353, "desc": "可灵 Kling（快手资源）",                    "types": ["image","video"]},
+    {"value": "Suno-1",      "label": "Suno 1",              "rate": 0.07353, "desc": "Suno 音乐生成",                            "types": ["music"]},
+    {"value": "Suno-2",      "label": "Suno 2",              "rate": 0.1103,  "desc": "Suno 音乐生成",                            "types": ["music"]},
 ]
 
 OUTPUT_FORMATS = [
@@ -111,13 +91,15 @@ class SettingsUpdateRequest(BaseModel):
 
 @router.get("/config/balance")
 async def get_balance():
-    """查询 API Key 余额（调用 yunwu.ai 订阅和用量接口）"""
-    if not settings.yunwu_api_key or settings.yunwu_api_key == "sk-your-api-key-here":
+    """查询 API Key 余额（OpenLux 支持 OpenAI 风格订阅/用量接口）"""
+    if not settings.openlux_api_key or settings.openlux_api_key == "sk-your-api-key-here":
         return {"configured": False, "error": "API Key 未配置"}
 
-    base_url = settings.yunwu_base_url.rstrip("/")
+    base_url = settings.openlux_base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        base_url = base_url[:-3]
     headers = {
-        "Authorization": f"Bearer {settings.yunwu_api_key}",
+        "Authorization": f"Bearer {settings.openlux_api_key}",
         "Content-Type": "application/json",
     }
 
@@ -201,7 +183,7 @@ async def get_groups():
 @router.get("/config/status")
 async def get_status():
     """检查 API Key 配置状态"""
-    configured = bool(settings.yunwu_api_key) and settings.yunwu_api_key != "sk-your-api-key-here"
+    configured = bool(settings.openlux_api_key) and settings.openlux_api_key != "sk-your-api-key-here"
     return {
         "api_configured": configured,
         "message": "API 已配置" if configured else "请配置 API Key",
@@ -212,8 +194,8 @@ async def get_status():
 async def get_settings():
     """获取当前设置"""
     return {
-        "api_key": settings.yunwu_api_key,
-        "base_url": settings.yunwu_base_url,
+        "api_key": settings.openlux_api_key,
+        "base_url": settings.openlux_base_url,
         "host": settings.host,
         "port": settings.port,
     }
