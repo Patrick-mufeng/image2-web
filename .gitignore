@@ -17,3 +17,10 @@ image/
 # Python
 __pycache__/
 *.pyc
+
+# 本地杂项（不入库）
+.zcode/
+output/
+social-card-mitu/
+data/error_logs.json
+*.log
