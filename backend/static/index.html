@@ -1,26 +1,67 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark" data-accent="ocean">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>觅图 mitu — AI 图片生成</title>
-  <link rel="stylesheet" href="/css/style.css?v=14">
+  <meta name="description" content="集成 GPT Image 系列模型的一站式 AI 生图工作台：文生图、图生图、案例库、历史与实时监控。">
+  <link rel="stylesheet" href="/css/style.css?v=18">
 </head>
 <body>
+  <!-- ═══ SVG 图标库（线性 24×24 / stroke 1.7）═══ -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15.5" r="4.5"/><path d="M11.2 12.3 21 3M15.5 7.5l2.5 2.5M18.5 4.5l2 2"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 18.5 10 13l4 4 2.5-2.5 3.5 3.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10 4.8 7.2 4.5 4 4.5v14c3.2 0 6 .3 8 2 2-1.7 4.8-2 8-2v-14c-3.2 0-6 .3-8 2z"/><path d="M12 6.5v14"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9V4z"/><circle cx="9" cy="9" r="1.4"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3.5 12h4l2.5-6 4 12 2.5-6h4"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 2.5 4 13.5h5L9 21.5l8-11h-5l0-8z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5v-11M7.5 9 12 4.5 16.5 9"/><path d="M4 15.5v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 8.5A8 8 0 1 0 20.5 15"/><path d="M20 3.5v5h-5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v11M7.5 12 12 16.5 16.5 12"/><path d="M4 16.5v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6.2.6l3-3a4 4 0 0 0-5.6-5.6L12 7.3"/><path d="M14 10a4 4 0 0 0-6.2-.6l-3 3a4 4 0 0 0 5.6 5.6L12 16.7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5L19.5 7"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3.5 21 8l-9 4.5L3 8l9-4.5z"/><path d="M3 12.5l9 4.5 9-4.5"/><path d="M3 16.5l9 4.5 9-4.5"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z"/></symbol>
+    <symbol id="i-chevL" viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></symbol>
+    <symbol id="i-chevR" viewBox="0 0 24 24"><path d="M9.5 5.5 16 12l-6.5 6.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19L12 4z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5h2.7l1.8-2.5h7l1.8 2.5H20a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19.5H4A1.5 1.5 0 0 1 2.5 18v-8A1.5 1.5 0 0 1 4 8.5z"/><circle cx="12" cy="13.5" r="3.2"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5.5 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v.5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.5M12 18.7v2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2.8 12h2.5M18.7 12h2.5M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 4.5v15M6.5 13.5 12 19l5.5-5.5"/></symbol>
+  </svg>
+
   <div id="app">
     <!-- ═══ Header ═══ -->
     <header class="hdr">
       <div class="hdr-l">
-        <div class="hdr-logo">🎨</div>
-        <span class="hdr-title" style="letter-spacing:0.18em">觅<em style="letter-spacing:0.18em">图</em> <span class="hdr-eng">mitu</span></span>
+        <div class="hdr-logo"><svg class="ic"><use href="#i-image"/></svg></div>
+        <span class="hdr-title">觅图 <em class="hdr-eng">mitu</em></span>
+        <span class="hdr-badge">AI 生图工作台</span>
       </div>
       <div class="hdr-r">
         <span class="hdr-status" id="apiStatus">
           <span class="hdr-dot" id="statusDot"></span>
           <span id="statusText">检查中</span>
         </span>
+        <div class="accent-sw" id="accentSw" role="group" aria-label="强调色">
+          <button class="accent-dot" data-accent="emerald" title="翡翠 Emerald" style="--dot:#23e2a0"></button>
+          <button class="accent-dot active" data-accent="ocean" title="静海 Ocean" style="--dot:#2aa9e8"></button>
+          <button class="accent-dot" data-accent="iris" title="鸢尾 Iris" style="--dot:#845ee7"></button>
+          <button class="accent-dot" data-accent="amber" title="琥珀 Amber" style="--dot:#e69d23"></button>
+          <button class="accent-dot" data-accent="sakura" title="绯樱 Sakura" style="--dot:#e0527c"></button>
+        </div>
+        <button class="btn btn-icon" id="btnSettings" title="API 设置" aria-label="API 设置">
+          <svg class="ic"><use href="#i-settings"/></svg>
+        </button>
         <button class="btn btn-icon" id="btnTheme" title="切换主题" aria-label="切换主题">
-          <span id="themeIcon">🌙</span>
+          <span id="themeIcon"></span>
         </button>
       </div>
     </header>
@@ -30,113 +71,97 @@
       <!-- ─── Nav ─── -->
       <nav class="nav" id="nav">
         <button class="nav-item active" data-tab="0">
-          <span class="nav-icon">🔑</span>
-          <span class="nav-label">Key 设置</span>
+          <svg class="ic"><use href="#i-home"/></svg>
+          <span class="nav-label">概览</span>
+          <span class="nav-arrow"><svg class="ic"><use href="#i-chevR"/></svg></span>
         </button>
         <button class="nav-item" data-tab="1">
-          <span class="nav-icon">🎨</span>
+          <svg class="ic"><use href="#i-image"/></svg>
           <span class="nav-label">图片生成</span>
+          <span class="nav-arrow"><svg class="ic"><use href="#i-chevR"/></svg></span>
         </button>
         <button class="nav-item" data-tab="2">
-          <span class="nav-icon">📜</span>
+          <svg class="ic"><use href="#i-clock"/></svg>
           <span class="nav-label">生成历史</span>
+          <span class="nav-arrow"><svg class="ic"><use href="#i-chevR"/></svg></span>
         </button>
         <button class="nav-item" data-tab="3">
-          <span class="nav-icon">📚</span>
+          <svg class="ic"><use href="#i-book"/></svg>
           <span class="nav-label">案例展示</span>
+          <span class="nav-arrow"><svg class="ic"><use href="#i-chevR"/></svg></span>
         </button>
         <button class="nav-item" data-tab="4">
-          <span class="nav-icon">🖼️</span>
+          <svg class="ic"><use href="#i-tag"/></svg>
           <span class="nav-label">元数据</span>
+          <span class="nav-arrow"><svg class="ic"><use href="#i-chevR"/></svg></span>
         </button>
         <button class="nav-item" data-tab="5">
-          <span class="nav-icon">📡</span>
+          <svg class="ic"><use href="#i-pulse"/></svg>
           <span class="nav-label">实时监控</span>
+          <span class="nav-arrow"><svg class="ic"><use href="#i-chevR"/></svg></span>
         </button>
         <div class="nav-footer">
-          <span class="nav-author">作者：Patrick</span>
-          <span class="nav-version">版本：V3.0</span>
+          <span class="nav-author">觅图 mitu · OpenLux</span>
+          <span class="nav-version">V3.2 · 暗色静海</span>
         </div>
       </nav>
 
       <!-- ─── Content ─── -->
       <main class="content">
 
-        <!-- ═══ TAB 0: Key Settings ═══ -->
+        <!-- ═══ TAB 0: 概览 Dashboard ═══ -->
         <section class="tab-pane active" id="tab0">
-          <div class="settings-wrap">
-            <div class="page page-settings">
-              <h2 class="page-title">Key 设置</h2>
-              <p class="page-desc">配置 API 连接信息</p>
-              <div class="s-card">
-                <div class="s-row">
-                  <label>OpenLux API • 连接状态</label>
-                  <div id="pageStatus"></div>
-                </div>
-                <div class="s-row">
-                  <label for="pageBaseUrl">Base URL</label>
-                  <input type="text" id="pageBaseUrl" placeholder="https://api.openlux.ai" spellcheck="false">
-                </div>
-                <div class="s-row">
-                  <label for="pageApiKey">API Key</label>
-                  <input type="password" id="pageApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
-                  <p class="s-hint">保存后即刻生效，无需重启</p>
-                </div>
-                <button class="btn btn-p" id="pageSaveBtn">保存设置</button>
-              </div>
+          <div class="page page-dash">
+            <div class="dash-top">
+              <h2 class="page-title">概览</h2>
+              <p class="page-desc">今天想生成点什么？</p>
+            </div>
 
-              <!-- Balance Card -->
-              <div class="s-card balance-card" id="balanceCard" style="display:none">
-                <div class="balance-h">
-                  <span>💰 余额信息</span>
-                  <span class="balance-status" id="balanceStatus">查询中...</span>
-                </div>
-                <div class="balance-body" id="balanceBody">
-                  <div class="balance-row">
-                    <span class="balance-lbl">令牌</span>
-                    <span class="balance-val" id="balanceToken">-</span>
-                  </div>
-                  <div class="balance-row">
-                    <span class="balance-lbl">本月用量</span>
-                    <span class="balance-val" id="balanceUsage">-</span>
-                  </div>
-                  <div class="balance-row">
-                    <span class="balance-lbl">剩余额度</span>
-                    <span class="balance-val" id="balanceRemain">-</span>
-                  </div>
-                </div>
+            <div class="metric-grid dash-metrics" id="balanceCard" style="display:none">
+              <div class="metric-card fluid" data-material="ocean">
+                <span class="metric-kicker">TOKEN</span>
+                <div class="metric-title"><svg class="ic"><use href="#i-key"/></svg>账户令牌</div>
+                <strong class="metric-num" id="balanceToken">-</strong>
+              </div>
+              <div class="metric-card fluid" data-material="rain">
+                <span class="metric-kicker">USAGE · 本月</span>
+                <div class="metric-title"><svg class="ic"><use href="#i-pulse"/></svg>已用额度</div>
+                <strong class="metric-num" id="balanceUsage">-</strong>
+              </div>
+              <div class="metric-card fluid" data-material="chrome">
+                <span class="metric-kicker">REMAIN</span>
+                <div class="metric-title"><svg class="ic"><use href="#i-layers"/></svg>剩余额度</div>
+                <strong class="metric-num" id="balanceRemain">-</strong>
+              </div>
+              <div class="metric-card fluid" data-material="ocean">
+                <span class="metric-kicker">TODAY</span>
+                <div class="metric-title"><svg class="ic"><use href="#i-image"/></svg>今日生成</div>
+                <strong class="metric-num" id="dashToday">-</strong>
               </div>
             </div>
-            <div class="page page-info">
-              <h2 class="page-title">📖 帮助信息</h2>
-              <div class="info-card">
-                <h3>🔑 获取 API Key</h3>
-                <p>注册 <a href="https://doc.openlux.ai" target="_blank" class="info-link">OpenLux</a>，在控制台创建 API Key。</p>
-                <p style="margin-top:6px">推荐使用 <strong>image2 模型</strong>，支持 2K、4K 图片生成。</p>
+
+            <div class="dash-grid">
+              <div class="dash-panel panel">
+                <div class="dash-panel-h">
+                  <span>最近生成</span>
+                  <span class="dash-status" id="balanceStatus">查询中...</span>
+                </div>
+                <div class="dash-recent" id="overviewRecent">
+                  <p class="dash-empty">暂无生成记录，去生成第一张图吧</p>
+                </div>
               </div>
-              <div class="info-card">
-                <h3>💰 价格说明</h3>
-                <p>平均每张约 <strong>0.5 元</strong> 左右。系统会自动分组生成，不同分组价格略有差异，由中转站决定。</p>
-              </div>
-              <div class="info-card">
-                <h3>📝 使用说明</h3>
-                <ul class="info-list">
-                  <li>填入 Base URL 和 API Key，点击保存</li>
-                  <li>切换到「图片生成」标签，选择比例和模型</li>
-                  <li>输入提示词（支持中文/英文），点击生成</li>
-                  <li>支持独立提示词模式：每行一个提示词，各生成一张</li>
-                  <li>「风格模板」可快速套用结构化提示词</li>
-                  <li>生成结果可下载、复制链接、重试</li>
-                </ul>
-              </div>
-              <div class="info-card">
-                <h3>🎯 特色功能</h3>
-                <ul class="info-list">
-                  <li>实时监控：查看每次请求的完整 JSON</li>
-                  <li>生成历史：保存所有生成记录</li>
-                  <li>案例展示：内置 453 个案例参考</li>
-                  <li>元数据编辑：批量修改图片 EXIF 信息</li>
-                </ul>
+              <div class="dash-panel panel">
+                <div class="dash-panel-h"><span>快捷入口</span></div>
+                <div class="dash-actions">
+                  <button class="btn btn-p dash-act" data-go="1"><svg class="ic"><use href="#i-spark"/></svg>立即生成</button>
+                  <button class="btn dash-act" data-go="3"><svg class="ic"><use href="#i-book"/></svg>案例灵感</button>
+                  <button class="btn dash-act" data-go="2"><svg class="ic"><use href="#i-clock"/></svg>生成历史</button>
+                  <button class="btn dash-act" data-go="5"><svg class="ic"><use href="#i-pulse"/></svg>实时监控</button>
+                </div>
+                <div class="dash-tip">
+                  <svg class="ic"><use href="#i-alert"/></svg>
+                  <span>计费 = 模型原价 × 分组倍率，顶栏齿轮可配置 API Key</span>
+                </div>
               </div>
             </div>
           </div>
@@ -145,19 +170,21 @@
         <!-- ═══ TAB 1: Image Generation ═══ -->
         <section class="tab-pane" id="tab1">
           <div class="page page-gen">
-            <!-- Mode Toggle -->
-            <div class="gen-mode">
-              <button class="gm-btn active" data-mode="txt2img" id="btnModeTxt2Img">🖊️ 文生图</button>
-              <button class="gm-btn" data-mode="img2img" id="btnModeImg2Img">🖼️ 图生图</button>
-            </div>
-
-            <!-- Control Bar -->
-            <div class="ctl">
+            <!-- 顶置控制条 -->
+            <div class="gen-top panel">
+              <div class="gen-mode">
+                <button class="gm-btn active" data-mode="txt2img" id="btnModeTxt2Img">
+                  <svg class="ic"><use href="#i-image"/></svg>文生图
+                </button>
+                <button class="gm-btn" data-mode="img2img" id="btnModeImg2Img">
+                  <svg class="ic"><use href="#i-layers"/></svg>图生图
+                </button>
+              </div>
               <div class="ctl-g">
                 <label class="ctl-lbl">比例</label>
                 <div class="ctl-pills" id="ratioGrid"></div>
               </div>
-              <div class="ctl-g" style="min-width:120px">
+              <div class="ctl-g" style="min-width:118px">
                 <label class="ctl-lbl">分辨率</label>
                 <select class="ctl-sel" id="resolutionSelect">
                   <option value="1">1MP · 标准</option>
@@ -165,19 +192,17 @@
                   <option value="4">4MP · 超清</option>
                 </select>
               </div>
-              <div class="ctl-g" style="min-width:150px">
+              <div class="ctl-g" style="min-width:138px">
                 <label class="ctl-lbl">分组 <span class="ctl-rate" id="groupRate"></span></label>
                 <select class="ctl-sel" id="groupSelect"><option>加载中...</option></select>
               </div>
-              <div class="ctl-g" style="min-width:150px">
+              <div class="ctl-g" style="min-width:140px">
                 <label class="ctl-lbl">模型</label>
                 <select class="ctl-sel" id="modelSelect"><option>加载中...</option></select>
               </div>
-              <div class="ctl-g" style="min-width:140px">
+              <div class="ctl-g" style="min-width:120px">
                 <label class="ctl-lbl">风格模板</label>
-                <select class="ctl-sel" id="templateSelect">
-                  <option value="">无模板</option>
-                </select>
+                <select class="ctl-sel" id="templateSelect"><option value="">无模板</option></select>
               </div>
               <div class="ctl-g">
                 <label class="ctl-lbl">数量</label>
@@ -190,79 +215,79 @@
               </div>
             </div>
 
-            <!-- Gen Body: Left Prompt + Right Results -->
-            <div class="gen-split">
-              <!-- Left: Prompt -->
-              <div class="gen-left">
-                <!-- Image Upload Area (图生图) -->
-                <div class="img2img-area" id="img2imgArea" style="display:none">
-                  <div class="upload-zone" id="uploadZone">
-                    <div class="uz-icon">📸</div>
-                    <div class="uz-text">拖拽图片到这里，或<span class="uz-link" id="btnBrowse">点击选择</span></div>
-                    <div class="uz-hint">支持 JPG / PNG / WebP，最多 16 张，共 50MB</div>
-                    <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
-                  </div>
-                  <div class="upload-previews" id="uploadPreviews"></div>
-                  <div class="mask-toggle" id="maskToggle">
-                    <label class="tog">
-                      <input type="checkbox" id="maskMode">
-                      <span class="tog-track"></span>
-                      <span class="tog-lbl">使用蒙版 <span class="tog-ht">（可选，PNG）</span></span>
-                    </label>
-                  </div>
-                  <div class="mask-upload" id="maskUpload" style="display:none">
-                    <input type="file" id="maskInput" accept="image/png" style="display:none">
-                    <button class="btn btn-s" id="btnMaskBrowse">🎭 上传蒙版</button>
-                    <span class="mask-name" id="maskName">未选择</span>
-                  </div>
-                </div>
-
-                <div class="prompt-area">
-                  <textarea id="promptInput" placeholder="描述你想要生成的图片…" maxlength="4000"></textarea>
-                  <div class="prompt-foot">
-                    <span class="char-count" id="charCount">0 / 4000</span>
-                    <label class="tog">
-                      <input type="checkbox" id="multiMode">
-                      <span class="tog-track"></span>
-                      <span class="tog-lbl">独立模式 <span class="tog-ht" id="multiHint">每行各一张</span></span>
-                    </label>
-                  </div>
-                </div>
-                <div class="prompt-acts">
-                  <button class="btn gen-btn" id="btnGenerate" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span id="btnGenLabel">生成</span>
-                  </button>
-                  <button class="btn btn-s" id="btnCancel" style="display:none">取消</button>
-                </div>
-              </div>
-
-              <!-- Right: Results -->
-              <div class="gen-right">
+            <!-- 全宽画布 -->
+            <div class="gen-canvas panel">
+              <div class="canvas-center">
                 <div class="g-empty" id="emptyState">
-                  <div class="g-empty-icon">🎨</div>
-                  <p>输入描述词，点击生成</p>
+                  <div class="g-empty-icon"><svg class="ic"><use href="#i-image"/></svg></div>
+                  <p>输入提示词，点击生成</p>
+                  <div class="g-empty-hint">快捷键 <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> 快速生成 · <span class="kbd">Ctrl</span> + <span class="kbd">1~6</span> 切换页面</div>
                 </div>
-
                 <div class="g-prog" id="genBox" style="display:none">
                   <div class="g-prog-h">
-                    <span>⚡ 生成中</span>
+                    <span><svg class="ic"><use href="#i-spark"/></svg>生成中</span>
                     <span class="g-bdg" id="genBadge">处理中</span>
                   </div>
                   <div class="g-bar"><div class="g-fill" id="genBar"></div></div>
                   <div class="g-log" id="genLog"></div>
                 </div>
-
                 <div class="g-res" id="resultsWrap">
                   <div class="g-res-h">
-                    <span>🖼️ 生成结果</span>
+                    <span><svg class="ic"><use href="#i-image"/></svg>生成结果</span>
                     <span class="g-res-c" id="resultsCount"></span>
                     <div class="g-res-acts">
-                      <button class="btn btn-s btn-sm" id="btnRetry" style="display:none">🔄 重试</button>
-                      <button class="btn btn-s btn-sm" id="btnDownloadAll" style="display:none">📥 全部下载</button>
+                      <button class="btn btn-s btn-sm" id="btnRetry" style="display:none"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
+                      <button class="btn btn-s btn-sm" id="btnDownloadAll" style="display:none"><svg class="ic"><use href="#i-download"/></svg>全部下载</button>
                     </div>
                   </div>
                   <div class="g-grid" id="imgGrid"></div>
+                </div>
+              </div>
+
+              <!-- 提示词浮层 -->
+              <div class="prompt-dock panel" id="promptDock">
+                <button class="dock-min" id="btnDockMin" title="收起 / 展开提示词"><svg class="ic"><use href="#i-chevR"/></svg></button>
+                <div class="dock-head">
+                  <div class="dh-l"><svg class="ic"><use href="#i-spark"/></svg>提示词 Prompt</div>
+                  <span class="dh-spark">CTRL + ENTER</span>
+                </div>
+                <div class="dock-body">
+                  <div class="img2img-area" id="img2imgArea" style="display:none">
+                    <div class="upload-zone" id="uploadZone">
+                      <div class="uz-icon"><svg class="ic"><use href="#i-camera"/></svg></div>
+                      <div class="uz-text">拖拽图片到这里，或<span class="uz-link" id="btnBrowse">点击选择</span></div>
+                      <div class="uz-hint">JPG / PNG / WebP · 最多 16 张 · 50MB</div>
+                      <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+                    </div>
+                    <div class="upload-previews" id="uploadPreviews"></div>
+                    <div class="mask-toggle" id="maskToggle">
+                      <label class="tog">
+                        <input type="checkbox" id="maskMode"><span class="tog-track"></span>
+                        <span class="tog-lbl">使用蒙版 <span class="tog-ht">（可选，PNG）</span></span>
+                      </label>
+                    </div>
+                    <div class="mask-upload" id="maskUpload" style="display:none">
+                      <input type="file" id="maskInput" accept="image/png" style="display:none">
+                      <button class="btn btn-s btn-sm" id="btnMaskBrowse"><svg class="ic"><use href="#i-layers"/></svg>上传蒙版</button>
+                      <span class="mask-name" id="maskName">未选择</span>
+                    </div>
+                  </div>
+                  <div class="prompt-area">
+                    <textarea id="promptInput" placeholder="描述你想要生成的图片…" maxlength="4000"></textarea>
+                    <div class="prompt-foot">
+                      <span class="char-count" id="charCount">0 / 4000</span>
+                      <label class="tog">
+                        <input type="checkbox" id="multiMode"><span class="tog-track"></span>
+                        <span class="tog-lbl">独立模式 <span class="tog-ht" id="multiHint">每行各一张</span></span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="prompt-acts">
+                    <button class="btn gen-btn" id="btnGenerate" disabled>
+                      <svg class="ic"><use href="#i-send"/></svg><span id="btnGenLabel">生成</span>
+                    </button>
+                    <button class="btn btn-s" id="btnCancel" style="display:none">取消</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -286,7 +311,7 @@
         <section class="tab-pane" id="tab3">
           <div class="page">
             <div class="page-h">
-              <h2 class="page-title">📚 案例展示</h2>
+              <h2 class="page-title">案例展示</h2>
               <span class="case-count" id="caseCount">加载中...</span>
             </div>
             <div class="case-filter" id="caseFilter">
@@ -302,14 +327,13 @@
         <section class="tab-pane" id="tab4">
           <div class="page">
             <div class="page-h" style="flex-direction:column;align-items:flex-start;gap:2px">
-              <h2 class="page-title">🖼️ 元数据</h2>
+              <h2 class="page-title">元数据</h2>
               <p class="page-desc" style="margin-bottom:0">批量修改图片元数据，减少平台对 AI 识别</p>
             </div>
             <div class="meta-body">
-              <!-- Top: Upload bar (always visible) -->
-              <div class="meta-upload" id="metaDrop">
+              <div class="meta-upload panel" id="metaDrop">
                 <div class="mu-left">
-                  <span class="mu-icon">📸</span>
+                  <span class="mu-icon"><svg class="ic"><use href="#i-upload"/></svg></span>
                   <span><strong>拖拽图片到此处</strong> 或 <span class="mu-link" id="btnMetaBrowse">点击选择</span></span>
                   <span class="mu-hint">JPG / PNG / WebP / TIFF</span>
                 </div>
@@ -317,43 +341,26 @@
                 <input type="file" id="metaFileInput" accept="image/*" multiple style="display:none">
               </div>
 
-              <!-- Main: Left Controls + Right Thumbnails -->
               <div class="meta-main">
-                <!-- Left: Controls -->
-                <div class="meta-left">
+                <div class="meta-left panel">
                   <div class="meta-presets">
                     <label class="ctl-lbl">PS 预设</label>
-                    <select class="ctl-sel" id="metaPreset">
-                      <option value="">选择预设...</option>
-                    </select>
+                    <select class="ctl-sel" id="metaPreset"><option value="">选择预设...</option></select>
                   </div>
-                  <div class="mf-row">
-                    <label>作者 (Artist)</label>
-                    <input type="text" id="metaArtist" placeholder="摄影师姓名" spellcheck="false">
-                  </div>
-                  <div class="mf-row">
-                    <label>版权 (Copyright)</label>
-                    <input type="text" id="metaCopyright" placeholder="Copyright © 2024 ..." spellcheck="false">
-                  </div>
-                  <div class="mf-row">
-                    <label>描述 (Description)</label>
-                    <input type="text" id="metaDescription" placeholder="图片描述" spellcheck="false">
-                  </div>
-                  <div class="mf-row">
-                    <label>软件 (Software)</label>
-                    <input type="text" id="metaSoftware" placeholder="Adobe Photoshop 25.0" spellcheck="false">
-                  </div>
+                  <div class="mf-row"><label>作者 (Artist)</label><input type="text" id="metaArtist" placeholder="摄影师姓名" spellcheck="false"></div>
+                  <div class="mf-row"><label>版权 (Copyright)</label><input type="text" id="metaCopyright" placeholder="Copyright © 2024 ..." spellcheck="false"></div>
+                  <div class="mf-row"><label>描述 (Description)</label><input type="text" id="metaDescription" placeholder="图片描述" spellcheck="false"></div>
+                  <div class="mf-row"><label>软件 (Software)</label><input type="text" id="metaSoftware" placeholder="Adobe Photoshop 25.0" spellcheck="false"></div>
                   <div class="mf-actions" style="flex-wrap:wrap">
-                    <button class="btn btn-p" id="btnMetaWrite" style="flex:1">💾 保存</button>
-                    <button class="btn btn-s" id="btnMetaSavePreset" style="flex:1">💿 另存为预设</button>
-                    <button class="btn btn-s" id="btnMetaBatch" style="flex:1">📦 批量处理全部</button>
+                    <button class="btn btn-p" id="btnMetaWrite" style="flex:1">保存</button>
+                    <button class="btn btn-s" id="btnMetaSavePreset" style="flex:1">另存为预设</button>
+                    <button class="btn btn-s" id="btnMetaBatch" style="flex:1">批量处理全部</button>
                   </div>
-                  <div class="meta-exif" id="metaExif">
+                  <div class="meta-exif">
                     <div class="ctl-lbl" style="margin-bottom:4px">EXIF 信息</div>
                     <pre class="meta-exif-content" id="metaExifContent">暂无</pre>
                   </div>
                 </div>
-                <!-- Right: Thumbnails grid -->
                 <div class="meta-right" id="metaRight">
                   <div class="meta-thumbs" id="metaThumbs">
                     <div class="meta-thumbs-empty">拖拽图片到上方上传栏</div>
@@ -361,9 +368,8 @@
                 </div>
               </div>
 
-              <!-- Batch progress -->
-              <div class="meta-batch" id="metaBatch" style="display:none">
-                <div class="g-prog-h"><span>📦 批量处理</span><span class="g-bdg" id="metaBatchStatus"></span></div>
+              <div class="meta-batch panel" id="metaBatch" style="display:none">
+                <div class="g-prog-h"><span>批量处理</span><span class="g-bdg" id="metaBatchStatus"></span></div>
                 <div class="g-bar"><div class="g-fill idet" id="metaBatchBar"></div></div>
                 <div class="g-log" id="metaBatchLog" style="max-height:120px"></div>
               </div>
@@ -382,33 +388,25 @@
                 <button class="btn btn-s btn-sm" id="btnClearMonitor" style="display:none">清空</button>
               </div>
             </div>
-
-            <!-- Empty state -->
             <div class="mon-empty" id="monEmpty">
-              <div class="mon-empty-icon">📡</div>
+              <div class="mon-empty-icon"><svg class="ic"><use href="#i-pulse"/></svg></div>
               <p>暂无请求记录</p>
               <p class="mon-empty-sub">执行图片生成后，请求与响应的详细信息将在此实时显示</p>
             </div>
-
-            <!-- Active monitor -->
             <div class="mon-body" id="monBody" style="display:none">
-
-              <!-- History list -->
-              <div class="mon-p" id="monHistoryPanel">
+              <div class="mon-p panel" id="monHistoryPanel">
                 <div class="mon-p-h">
-                  <span>📋 请求历史</span>
+                  <span>请求历史</span>
                   <div style="display:flex;gap:6px;align-items:center">
                     <span class="mon-tag" id="monHistoryCount">0 条</span>
-                    <button class="btn btn-s btn-sm" id="btnRefreshHistory" title="刷新">🔄</button>
+                    <button class="btn btn-s btn-sm" id="btnRefreshHistory" title="刷新"><svg class="ic"><use href="#i-refresh"/></svg></button>
                   </div>
                 </div>
                 <div class="mon-history-list" id="monHistoryList">
                   <p style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px">加载中...</p>
                 </div>
               </div>
-
-              <!-- Status bar -->
-              <div class="mon-statusbar" id="monStatusBar">
+              <div class="mon-statusbar panel" id="monStatusBar">
                 <div class="mon-sb-left">
                   <span class="mon-sb-status" id="monSbStatus">⏳ 处理中</span>
                   <span class="mon-sb-sep">|</span>
@@ -422,35 +420,26 @@
                   <span id="monSbTag" class="mon-sb-tag running">处理中</span>
                 </div>
               </div>
-
-              <!-- Progress bar -->
-              <div class="mon-progress" id="monProgress">
-                <div class="mon-prog-bar">
-                  <div class="mon-prog-fill" id="monProgFill"></div>
-                </div>
+              <div class="mon-progress panel" id="monProgress">
+                <div class="mon-prog-bar"><div class="mon-prog-fill" id="monProgFill"></div></div>
                 <div class="mon-prog-steps" id="monProgSteps">
-                  <span class="mp-step active" data-step="send">📤 发送请求</span>
-                  <span class="mp-step" data-step="api">⚙ API 处理</span>
-                  <span class="mp-step" data-step="download">📥 下载图片</span>
-                  <span class="mp-step" data-step="done">✅ 完成</span>
+                  <span class="mp-step active" data-step="send">发送请求</span>
+                  <span class="mp-step" data-step="api">API 处理</span>
+                  <span class="mp-step" data-step="download">下载图片</span>
+                  <span class="mp-step" data-step="done">完成</span>
                 </div>
               </div>
-
-              <!-- Main panels -->
               <div class="mon-panels">
-                <!-- Left: Request -->
-                <div class="mon-p">
-                  <div class="mon-p-h"><span>📤 请求参数</span><span class="mon-tag">REQUEST</span></div>
+                <div class="mon-p panel">
+                  <div class="mon-p-h"><span>请求参数</span><span class="mon-tag">REQUEST</span></div>
                   <div class="mon-p-body">
                     <table class="mon-table" id="monReqTable"></table>
                     <div class="mon-section-title">提示词</div>
                     <pre class="mon-code mon-code-prompt" id="monReqPrompt"></pre>
                   </div>
                 </div>
-
-                <!-- Right: Response -->
-                <div class="mon-p">
-                  <div class="mon-p-h"><span>📥 响应结果</span><span class="mon-tag" id="monResTag">--</span></div>
+                <div class="mon-p panel">
+                  <div class="mon-p-h"><span>响应结果</span><span class="mon-tag" id="monResTag">--</span></div>
                   <div class="mon-p-body">
                     <table class="mon-table" id="monResTable"></table>
                     <div class="mon-section-title" id="monResJsonTitle" style="display:none">原始响应 JSON</div>
@@ -458,24 +447,19 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Step timeline -->
-              <div class="mon-p">
-                <div class="mon-p-h"><span>⏱ 分步耗时</span><span class="mon-tag">TIMELINE</span></div>
+              <div class="mon-p panel">
+                <div class="mon-p-h"><span>分步耗时</span><span class="mon-tag">TIMELINE</span></div>
                 <div class="mon-p-body" id="monStepsBody">
                   <p style="color:var(--text3);font-size:.75rem;text-align:center;padding:12px">等待数据...</p>
                 </div>
               </div>
-
-              <!-- Error panel -->
-              <div class="mon-p mon-p-err" id="monError" style="display:none">
-                <div class="mon-p-h"><span>❌ 错误详情</span><span class="mon-tag" style="background:rgba(220,80,80,.1);color:var(--red)">ERROR</span></div>
+              <div class="mon-p panel mon-p-err" id="monError" style="display:none">
+                <div class="mon-p-h"><span>错误详情</span><span class="mon-tag" style="background:rgba(220,80,80,.1);color:var(--red)">ERROR</span></div>
                 <div class="mon-p-body">
                   <div class="mon-err-msg" id="monErrMsg"></div>
                   <pre class="mon-code mon-code-err" id="monErrTrace"></pre>
                 </div>
               </div>
-
             </div>
           </div>
         </section>
@@ -487,11 +471,52 @@
     <div class="toast-wrap" id="toastWrap"></div>
   </div>
 
+  <!-- ═══ 设置抽屉 ═══ -->
+  <div class="drawer-bg" id="drawerBg" style="display:none"></div>
+  <aside class="drawer" id="settingsDrawer" aria-hidden="true">
+    <div class="drawer-h">
+      <div>
+        <h2 class="drawer-title">API 设置</h2>
+        <p class="drawer-sub">OpenLux · 保存后即刻生效</p>
+      </div>
+      <button class="btn btn-s btn-sm" id="btnDrawerClose"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-status">
+        <span class="ctl-lbl">连接状态</span>
+        <div id="pageStatus"></div>
+      </div>
+      <div class="s-row">
+        <label for="pageBaseUrl">Base URL</label>
+        <input type="text" id="pageBaseUrl" placeholder="https://api.openlux.ai" spellcheck="false">
+      </div>
+      <div class="s-row">
+        <label for="pageApiKey">API Key</label>
+        <input type="password" id="pageApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
+        <p class="s-hint">余额查看见「概览」页</p>
+      </div>
+      <button class="btn btn-p" id="pageSaveBtn" style="width:100%">保存设置</button>
+
+      <div class="drawer-sep"></div>
+
+      <div class="ctl-lbl" style="margin-bottom:8px">帮助信息</div>
+      <div class="info-list">
+        <li>注册 <a href="https://doc.openlux.ai" target="_blank" class="info-link">OpenLux</a> 控制台创建 API Key</li>
+        <li>推荐 <strong>gpt-image-2</strong>，支持 2K/4K 生成</li>
+        <li>计费 = 模型原价 × 分组倍率（默认 ×0.07353）</li>
+        <li>429 繁忙会自动退避重试（5s/10s/20s）</li>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <span class="nav-version">V3.2 · OpenLux · Patrick</span>
+    </div>
+  </aside>
+
   <!-- ═══ Case Detail Modal ═══ -->
   <div class="modal-bg" id="caseModal" style="display:none">
     <div class="modal modal-wide" style="max-width:960px;width:80%">
       <div class="modal-h">
-        <h2>📚 案例详情</h2>
+        <h2>案例详情</h2>
         <button class="btn btn-s btn-sm" id="btnCloseCase">✕</button>
       </div>
       <div class="case-detail" id="caseDetail">
@@ -500,7 +525,7 @@
       </div>
       <div class="modal-foot">
         <button class="btn btn-s" id="btnCloseCase2">关闭</button>
-        <button class="btn btn-p" id="btnCaseUse">✏️ 修改并生成</button>
+        <button class="btn btn-p" id="btnCaseUse">修改并生成</button>
       </div>
     </div>
   </div>
@@ -509,7 +534,7 @@
   <div class="modal-bg" id="aiModal" style="display:none">
     <div class="modal" style="max-width:520px">
       <div class="modal-h">
-        <h2>✨ AI 辅助写提示词</h2>
+        <h2>AI 辅助写提示词</h2>
         <button class="btn btn-s btn-sm" id="btnCloseAi">✕</button>
       </div>
       <div class="ai-body" id="aiBody">
@@ -529,7 +554,7 @@
       </div>
       <div class="modal-foot">
         <button class="btn btn-s" id="btnAiBack" style="display:none">← 返回</button>
-        <button class="btn btn-p" id="btnAiUse">✅ 使用此提示词</button>
+        <button class="btn btn-p" id="btnAiUse">使用此提示词</button>
       </div>
     </div>
   </div>
@@ -538,7 +563,7 @@
   <div class="modal-bg" id="histModal" style="display:none">
     <div class="modal modal-wide" style="max-width:820px;width:85%">
       <div class="modal-h">
-        <h2>📜 历史详情</h2>
+        <h2>历史详情</h2>
         <button class="btn btn-s btn-sm" id="btnCloseHist">✕</button>
       </div>
       <div class="hist-detail" id="histDetail">
@@ -547,7 +572,7 @@
       </div>
       <div class="modal-foot">
         <button class="btn btn-s" id="btnCloseHist2">关闭</button>
-        <button class="btn btn-p" id="btnHistModify">✏️ 修改并生成</button>
+        <button class="btn btn-p" id="btnHistModify">修改并生成</button>
       </div>
     </div>
   </div>
@@ -555,8 +580,14 @@
   <!-- ═══ Lightbox ═══ -->
   <div class="lb" id="lightbox" style="display:none">
     <img src="" alt="预览" id="lbImg">
+    <div class="lb-bar">
+      <span class="lb-name" id="lbName"></span>
+      <button class="btn btn-p btn-sm" id="lbDownload"><svg class="ic"><use href="#i-download"/></svg>下载</button>
+      <button class="btn btn-s btn-sm" id="lbCopy"><svg class="ic"><use href="#i-link"/></svg>复制链接</button>
+      <button class="btn btn-s btn-sm" id="lbClose"><svg class="ic"><use href="#i-close"/></svg>关闭</button>
+    </div>
   </div>
 
-  <script src="/js/app.js?v=14"></script>
+  <script src="/js/app.js?v=18"></script>
 </body>
 </html>

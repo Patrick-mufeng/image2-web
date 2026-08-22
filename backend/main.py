@@ -35,6 +35,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def no_cache_html(request, call_next):
+    """HTML 页面不缓存，确保前端更新后重新加载（CSS/JS 走 ?v= 版本号）"""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
 # API 路由
 app.include_router(generation.router, prefix="/api", tags=["生图"])
 app.include_router(history.router, prefix="/api", tags=["历史"])

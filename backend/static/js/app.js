@@ -1,8 +1,11 @@
 /**
- * Image2 — Apple 风格 v5
+ * Image2 — 暗色玻璃拟态 v15（Octopus 设计语言）
  */
 (function () {
   'use strict';
+
+  const ICON_SUN = '<svg class="ic"><use href="#i-sun"/></svg>';
+  const ICON_MOON = '<svg class="ic"><use href="#i-moon"/></svg>';
 
   const $ = id => document.getElementById(id);
   const DOM = {
@@ -64,7 +67,9 @@
   function toast(msg, type) {
     const t = document.createElement('div');
     t.className = 'toast ' + (type==='success'?'ok':type==='error'?'err':'info');
-    t.textContent = msg;
+    const icon = type==='success' ? 'i-check' : type==='error' ? 'i-alert' : 'i-spark';
+    t.innerHTML = '<svg class="ic t-ic"><use href="#'+icon+'"/></svg><span></span>';
+    t.querySelector('span').textContent = msg;
     DOM.toastWrap.appendChild(t);
     setTimeout(() => { t.classList.add('out'); t.addEventListener('animationend', () => t.remove()); }, 3500);
   }
@@ -158,12 +163,13 @@
     }
   }
 
-  // Auto-query balance when switching to tab 0
+  // Auto-query balance + overview when switching to tab 0
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
-      if (tab === '0' && S.apiConfigured) {
-        queryBalance();
+      if (tab === '0') {
+        loadOverview();
+        if (S.apiConfigured) queryBalance();
       }
     });
   });
@@ -402,17 +408,60 @@
       const src = img.local_path || img.url || '';
       const card = document.createElement('div'); card.className = 'img-card';
       card.style.animationDelay = (i*0.08)+'s';
-      let h = '<img src="'+esc(src)+'" alt="" loading="eager" onclick="window._lb(\''+esc(src)+'\')" onload="this.parentNode.querySelector(\'.img-size\').textContent=this.naturalWidth+\'×\'+this.naturalHeight">';
-      h += '<span class="img-size">...</span>';
-      h += '<div class="img-card-body"><div class="img-card-actions">';
-      h += '<a href="'+esc(src)+'" download="img_'+(i+1)+'.png" class="btn btn-p" style="text-decoration:none">📥 下载</a>';
-      h += '<button class="btn btn-s" onclick="window._cpy(\''+esc(src)+'\')">🔗 复制</button></div>';
-      if (img.revised_prompt) h += '<div class="revised">💡 '+esc(img.revised_prompt)+'</div>';
-      h += '</div>'; card.innerHTML = h; DOM.imgGrid.appendChild(card);
+      card.innerHTML = '<img src="'+esc(src)+'" alt="" loading="eager">' +
+        '<span class="img-size">...</span>' +
+        '<span class="qc">' +
+        '<button class="qc-btn" data-act="lb" title="放大预览"><svg class="ic"><use href="#i-image"/></svg></button>' +
+        '<button class="qc-btn" data-act="dl" title="下载"><svg class="ic"><use href="#i-download"/></svg></button>' +
+        '<button class="qc-btn" data-act="copy" title="复制链接"><svg class="ic"><use href="#i-link"/></svg></button></span>' +
+        '<div class="img-card-body"><div class="img-card-actions">' +
+        '<a href="'+esc(src)+'" download="img_'+(i+1)+'.png" class="btn btn-p" style="text-decoration:none">下载</a>' +
+        '<button class="btn btn-s" data-act="copy2">复制</button></div>' +
+        (img.revised_prompt ? '<div class="revised">' + esc(img.revised_prompt) + '</div>' : '') +
+        '</div>';
+      const imgel = card.querySelector('img');
+      imgel.onload = () => { const t = card.querySelector('.img-size'); if (t) t.textContent = imgel.naturalWidth + '×' + imgel.naturalHeight; };
+      imgel.onclick = () => window._lb(src);
+      card.querySelectorAll('[data-act]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const act = btn.dataset.act;
+          if (act === 'lb') window._lb(src);
+          else if (act === 'dl') window._dl(src);
+          else { window._cpy(src); }
+        });
+      });
+      DOM.imgGrid.appendChild(card);
     });
+    if (images.length === 1) {
+      const c = DOM.imgGrid.firstElementChild;
+      if (c) { c.classList.add('solo'); }
+    }
     DOM.resultsWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-  window._lb = function(src) { DOM.lightbox.style.display='flex'; DOM.lbImg.src=src; };
+  function closeLb() { DOM.lightbox.style.display='none'; DOM.lightbox.classList.remove('show'); }
+  window._lb = function(src) {
+    DOM.lightbox.style.display='flex'; DOM.lightbox.classList.add('show');
+    DOM.lbImg.src=src;
+    const nameEl = document.getElementById('lbName');
+    if (nameEl) nameEl.textContent = (src.split('/').pop() || '').slice(0, 46);
+  };
+  window._dl = async function(url) {
+    try {
+      const r = await fetch(url); const b = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = 'mitu_' + Date.now() + '.' + (b.type.includes('png') ? 'png' : 'jpg');
+      a.click(); URL.revokeObjectURL(a.href);
+      toast('已下载', 'success');
+    } catch(e) { toast('下载失败', 'error'); }
+  };
+  const lbDownload = document.getElementById('lbDownload');
+  const lbCopy = document.getElementById('lbCopy');
+  const lbClose = document.getElementById('lbClose');
+  if (lbDownload) lbDownload.addEventListener('click', () => window._dl(DOM.lbImg.src));
+  if (lbCopy) lbCopy.addEventListener('click', () => window._cpy(DOM.lbImg.src));
+  if (lbClose) lbClose.addEventListener('click', closeLb);
   window._cpy = async function(url) {
     try { await navigator.clipboard.writeText(url.startsWith('http')?url:location.origin+url); toast('已复制','success'); }
     catch(e) { toast('复制失败','error'); }
@@ -743,7 +792,7 @@
 
   async function generateImage() {
     if (!S.prompt.trim() || S.isGenerating) return;
-    if (!S.apiConfigured) { toast('请先配置 API Key','error'); switchTab(0); return; }
+    if (!S.apiConfigured) { toast('请先配置 API Key','error'); openSettings(); return; }
 
     // Image-to-image mode
     if (S.mode === 'img2img') {
@@ -852,7 +901,7 @@
 
   async function generateEdit() {
     if (!S.prompt.trim() || S.isGenerating || !S.uploadedFiles.length) return;
-    if (!S.apiConfigured) { toast('请先配置 API Key','error'); switchTab(0); return; }
+    if (!S.apiConfigured) { toast('请先配置 API Key','error'); openSettings(); return; }
 
     S.isGenerating = true; stopPoll();
     DOM.btnGenerate.style.display='none'; DOM.btnCancel.style.display='inline-flex';
@@ -1049,26 +1098,130 @@
   };
   window._goPage=function(p){if(p<1||p>Math.ceil(S.historyTotal/S.historyLimit))return;S.historyPage=p;loadHistory();};
 
+  // ── 设置抽屉 ──
+  const settingsDrawer = document.getElementById('settingsDrawer');
+  const drawerBg = document.getElementById('drawerBg');
+  function openSettings() {
+    if (!settingsDrawer) return;
+    renderSettings();
+    settingsDrawer.classList.add('open');
+    settingsDrawer.setAttribute('aria-hidden', 'false');
+    drawerBg.style.display = '';
+  }
+  function closeSettings() {
+    if (!settingsDrawer) return;
+    settingsDrawer.classList.remove('open');
+    settingsDrawer.setAttribute('aria-hidden', 'true');
+    drawerBg.style.display = 'none';
+  }
+  const btnSettings = document.getElementById('btnSettings');
+  if (btnSettings) btnSettings.addEventListener('click', openSettings);
+  const btnDrawerClose = document.getElementById('btnDrawerClose');
+  if (btnDrawerClose) btnDrawerClose.addEventListener('click', closeSettings);
+  if (drawerBg) drawerBg.addEventListener('click', closeSettings);
+
+  // ── 提示词浮层收起 ──
+  const promptDock = document.getElementById('promptDock');
+  const btnDockMin = document.getElementById('btnDockMin');
+  if (btnDockMin && promptDock) {
+    btnDockMin.addEventListener('click', () => promptDock.classList.toggle('collapsed'));
+  }
+
+  // ── Tab 0: 概览 Dashboard ──
+  let _ovRecs = [];
+  async function loadOverview() {
+    const recentEl = document.getElementById('overviewRecent');
+    const todayEl = document.getElementById('dashToday');
+    try {
+      const d = await api('GET', '/api/history?page=1&limit=8');
+      const recs = (d && d.records) || [];
+      const today = new Date();
+      const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      let todayCount = 0;
+      recs.forEach(r => {
+        const t = (r.created_at || '').slice(0, 10);
+        if (t === todayStr) todayCount++;
+      });
+      if (todayEl) {
+        const total = d && d.total ? '累计 ' + d.total : '';
+        todayEl.textContent = todayCount > 0 ? todayCount + ' 张' : '0 张';
+        todayEl.title = total || '';
+      }
+      if (recentEl) {
+        if (!recs.length) {
+          recentEl.innerHTML = '<p class="dash-empty">暂无生成记录，去生成第一张图吧</p>';
+        } else {
+          recentEl.innerHTML = recs.map((r, i) => {
+            const img = r.images && r.images[0];
+            const src = img ? (img.local_path || img.url || '') : '';
+            if (!src) return '';
+            return '<div class="recent-card" data-idx="' + i + '" title="' + esc((r.prompt || '').slice(0, 40)) + '">' +
+              '<img src="' + esc(src) + '" alt="" loading="lazy">' +
+              '<span class="recent-meta">' + esc(r.aspect_ratio || r.model || '') + ' · ' + esc(fmtTime(r.created_at)) + '</span></div>';
+          }).join('');
+          _ovRecs = recs;
+          recentEl.querySelectorAll('.recent-card').forEach(card => {
+            card.addEventListener('click', () => {
+              const i = +card.dataset.idx;
+              S.historyRecords = _ovRecs;
+              window._loadHist(i);
+            });
+          });
+        }
+      }
+    } catch(e) { console.warn('概览加载失败', e); }
+  }
+  document.querySelectorAll('.dash-act').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(+btn.dataset.go));
+  });
+
   // ── Theme Toggle ──
   function setTheme(dark) {
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
-    document.getElementById('themeIcon').textContent = dark ? '☀️' : '🌙';
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.getElementById('themeIcon').innerHTML = dark ? ICON_SUN : ICON_MOON;
     localStorage.setItem('img2-theme', dark ? 'dark' : 'light');
   }
   DOM.btnTheme = document.getElementById('btnTheme');
   DOM.themeIcon = document.getElementById('themeIcon');
   if (DOM.btnTheme) {
     const saved = localStorage.getItem('img2-theme');
-    if (saved === 'dark') setTheme(true);
+    if (saved === 'light') setTheme(false); else setTheme(true);  // 默认暗色
     DOM.btnTheme.addEventListener('click', () => {
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       setTheme(!isDark);
     });
   }
 
-  // ── Esc close lightbox ──
+  // ── Accent Switcher（5 套强调色） ──
+  function setAccent(accent) {
+    document.documentElement.setAttribute('data-accent', accent);
+    localStorage.setItem('mitu-accent', accent);
+    document.querySelectorAll('.accent-dot').forEach(d => {
+      d.classList.toggle('active', d.dataset.accent === accent);
+    });
+  }
+  const savedAccent = localStorage.getItem('mitu-accent');
+  if (savedAccent) setAccent(savedAccent);
+  document.querySelectorAll('.accent-dot').forEach(dot => {
+    dot.addEventListener('click', () => setAccent(dot.dataset.accent));
+  });
+
+  // ── 流体卡片：鼠标跟随高光 ──
+  document.querySelectorAll('.metric-card').forEach(card => {
+    card.addEventListener('pointermove', e => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--px', ((e.clientX - r.left) / r.width * 100) + '%');
+      card.style.setProperty('--py', ((e.clientY - r.top) / r.height * 100) + '%');
+    });
+  });
+
+  // ── Esc close lightbox / drawer ──
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { DOM.lightbox.style.display = 'none'; }
+    if (e.key === 'Escape') { closeLb(); closeSettings(); }
+    if (e.ctrlKey && !e.metaKey && !e.altKey && e.key >= '1' && e.key <= '6') {
+      e.preventDefault();
+      switchTab(+e.key - 1);
+    }
   });
 
   // ── Download All ──
@@ -1128,12 +1281,12 @@
   DOM.modelSelect.addEventListener('change',()=>{S.model=DOM.modelSelect.value;});
   DOM.countGroup.addEventListener('click',e=>{const b=e.target.closest('.p-btn');if(!b)return;S.numOutputs=+b.dataset.count;DOM.countGroup.querySelectorAll('.p-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');});
   if(DOM.multiMode){DOM.multiMode.addEventListener('change',()=>{S.multiMode=DOM.multiMode.checked;updMultiHint();});}
-  DOM.promptInput.addEventListener('input',()=>{S.prompt=DOM.promptInput.value;DOM.charCount.textContent=S.prompt.length+' / 4000';updMultiHint();updBtn();});
+  DOM.promptInput.addEventListener('input',()=>{S.prompt=DOM.promptInput.value;DOM.charCount.textContent=S.prompt.length+' / 4000';updMultiHint();updBtn();try{localStorage.setItem('mitu_prompt_draft', S.prompt);}catch(e){}});
   DOM.promptInput.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();generateImage();}});
   DOM.btnGenerate.addEventListener('click',generateImage);
   DOM.btnCancel.addEventListener('click',cancelGen);
   DOM.btnClearHistory.addEventListener('click',async()=>{if(!confirm('清空所有历史记录？'))return;await api('DELETE','/api/history');S.historyPage=1;loadHistory();toast('已清空','success');});
-  DOM.lightbox.addEventListener('click',()=>{DOM.lightbox.style.display='none';});
+  DOM.lightbox.addEventListener('click',()=>closeLb());
 
   // ── History Modal ──
   function closeHistModal(){
@@ -1738,6 +1891,15 @@
     }
     renderGroups(); renderModels(); updStatus(); renderSettings(); updBtn(); loadHistory();
 
+    // 恢复提示词草稿
+    const draft = localStorage.getItem('mitu_prompt_draft');
+    if (draft) {
+      S.prompt = draft;
+      DOM.promptInput.value = draft;
+      DOM.charCount.textContent = draft.length + ' / 4000';
+      updBtn();
+    }
+
     // Load templates
     await loadTemplates();
 
@@ -1752,6 +1914,9 @@
     });
 
     DOM.genBox.style.display='none';
+
+    // 概览页数据
+    loadOverview();
 
     // Auto-query balance on load if configured
     if (S.apiConfigured) {
