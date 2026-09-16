@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>觅图 mitu · 样板 2 瑞士纸面 Swiss Editorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   样板 2 · 瑞士纸面 Swiss Editorial
+   纸、墨、钴蓝。严谨栅格 + 排印驱动。
+   发丝线划分区域，大标题定调，功能字段如表格般排布。
+   ═══════════════════════════════════════════════ */
+:root{
+  --paper:#F6F6F3;         /* 纸白（中性，非暖米） */
+  --ink:#141413;           /* 墨黑 */
+  --ink-2:#565651;         /* 中灰 */
+  --ink-3:#8F8F88;         /* 浅灰 */
+  --line:#D8D8D2;          /* 发丝线 */
+  --cobalt:#2438E8;        /* 钴蓝，唯一强调 */
+  --disp:'Archivo','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  --mono:'Cascadia Code','Consolas',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:var(--disp);font-size:14px;
+  overflow:hidden;display:flex;flex-direction:column;
+}
+::selection{background:var(--cobalt);color:#fff}
+
+/* ── 报头 ─────────────────────────────── */
+.masthead{
+  flex:none;display:flex;align-items:flex-end;justify-content:space-between;
+  padding:30px 40px 22px;
+  border-bottom:2px solid var(--ink);
+}
+.mast-title{display:flex;align-items:baseline;gap:16px}
+.mast-title h1{
+  font-size:64px;font-weight:900;letter-spacing:-.03em;line-height:.94;
+}
+.mast-title .lat{
+  font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--ink-2);
+}
+.mast-meta{display:flex;gap:0;text-align:right}
+.mast-meta .cell{
+  padding:0 22px;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;gap:5px;
+}
+.mast-meta .k{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink-3)}
+.mast-meta .v{font-size:16px;font-weight:700}
+.mast-meta .v.blue{color:var(--cobalt)}
+
+/* ── 导航行 ───────────────────────────── */
+.navline{
+  flex:none;display:flex;align-items:center;
+  padding:0 40px;height:52px;
+  border-bottom:1px solid var(--ink);
+}
+.navline a{
+  color:var(--ink-2);text-decoration:none;font-weight:600;font-size:13.5px;
+  padding:0 18px;line-height:52px;position:relative;
+  transition:color .2s;
+}
+.navline a:first-child{padding-left:0}
+.navline a:hover{color:var(--ink)}
+.navline a.on{color:var(--cobalt)}
+.navline a.on::after{
+  content:"";position:absolute;left:18px;right:18px;bottom:-1px;height:3px;background:var(--cobalt);
+}
+.navline a:first-child.on::after{left:0}
+.nav-shortcut{
+  margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-3);
+}
+.nav-shortcut b{
+  font-weight:600;color:var(--ink-2);border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:3px;padding:1px 6px;margin:0 3px;background:#fff;
+}
+
+/* ── 主栅格 ───────────────────────────── */
+.grid{
+  flex:1;display:grid;grid-template-columns:7fr 5fr;min-height:0;
+}
+.col-l{padding:34px 40px;min-width:0;display:flex;flex-direction:column}
+.col-r{border-left:1px solid var(--ink);padding:34px 40px 34px 36px;display:flex;flex-direction:column;min-height:0;background:#FBFBF9}
+
+/* 字段标签（功能性，非装饰） */
+.flabel{
+  font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ink-2);
+  display:flex;justify-content:space-between;align-items:baseline;
+}
+.flabel .cnt{color:var(--ink-3);letter-spacing:.05em}
+.prompt-area{margin-top:14px;flex:0 0 auto;height:220px}
+.prompt-area textarea{
+  width:100%;height:100%;min-height:110px;resize:none;
+  border:none;outline:none;background:transparent;
+  font-family:var(--disp);font-size:21px;font-weight:500;line-height:1.62;
+  color:var(--ink);letter-spacing:-.005em;
+}
+.prompt-area .rule{height:1px;background:var(--ink);position:relative}
+.prompt-area .rule i{
+  position:absolute;top:-1px;left:0;height:3px;width:42px;background:var(--cobalt);
+}
+
+/* 最近提示词列表 */
+.recent{margin-top:34px}
+.recent .row{
+  display:flex;align-items:baseline;gap:18px;
+  padding:13px 0;border-bottom:1px solid var(--line);cursor:pointer;
+}
+.recent .row:first-of-type{border-top:1px solid var(--line)}
+.recent .row .t{
+  flex:1;font-size:14.5px;font-weight:500;color:var(--ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:color .2s;
+}
+.recent .row:hover .t{color:var(--cobalt)}
+.recent .row .m{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);white-space:nowrap}
+
+/* 控制字段表格 */
+.controls{
+  margin-top:auto;padding-top:8px;display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+}
+.ctrl{
+  padding:16px 18px 14px;border-left:1px solid var(--line);cursor:pointer;
+  transition:background .2s;
+}
+.ctrl:first-child{border-left:none;padding-left:0}
+.ctrl:hover{background:rgba(20,20,19,.03)}
+.ctrl .k{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink-3)}
+.ctrl .v{margin-top:8px;font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ctrl .v svg{width:12px;height:12px;stroke:var(--ink-3)}
+.ctrl .sub{margin-top:4px;font-size:11.5px;color:var(--ink-3)}
+
+/* 生成按钮 */
+.gen-row{margin-top:28px;display:flex;align-items:center;gap:18px}
+.btn-gen{
+  flex:none;height:56px;padding:0 46px;border:none;cursor:pointer;
+  background:var(--cobalt);color:#fff;
+  font-family:var(--disp);font-size:16px;font-weight:800;letter-spacing:.06em;
+  transition:background .2s,transform .15s;
+}
+.btn-gen:hover{background:var(--ink)}
+.btn-gen:active{transform:scale(.98)}
+.gen-note{font-family:var(--mono);font-size:11px;color:var(--ink-3);line-height:1.7}
+.gen-note b{color:var(--ink-2);font-weight:600}
+
+/* 生成中进度行 */
+.genline{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.genline .gk{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;color:var(--cobalt);font-weight:700;white-space:nowrap}
+.genline .gbar{flex:1;height:2px;background:var(--line);position:relative;overflow:hidden}
+.genline .gbar i{position:absolute;left:0;top:0;bottom:0;width:42%;background:var(--cobalt);animation:gpulse 1.6s ease-in-out infinite}
+@keyframes gpulse{50%{opacity:.5}}
+.genline .gv{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);white-space:nowrap}
+
+/* ── 右列：输出 ────────────────────────── */
+.out-hero{margin-top:16px;position:relative}
+.out-hero .frame{
+  aspect-ratio:16/10;overflow:hidden;background:#E8E8E3;position:relative;
+}
+.out-hero .frame img{width:100%;height:100%;object-fit:cover;display:block}
+.out-hero .tag{
+  position:absolute;top:0;left:0;background:var(--cobalt);color:#fff;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;padding:6px 12px;
+}
+.out-cap{
+  display:flex;justify-content:space-between;gap:20px;align-items:baseline;
+  padding:14px 0;border-bottom:1px solid var(--line);
+}
+.out-cap .p{font-size:13px;line-height:1.65;color:var(--ink-2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.out-cap .m{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);white-space:nowrap}
+.out-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.out-cell{cursor:pointer}
+.out-cell .th{aspect-ratio:1/1;overflow:hidden;background:#E8E8E3}
+.out-cell img{width:100%;height:100%;object-fit:cover;display:block;
+  transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.out-cell:hover img{transform:scale(1.05)}
+.out-cell .t{margin-top:8px;font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.out-cell:hover .t{color:var(--cobalt)}
+
+/* 入场初始态 */
+.rv{opacity:0}
+.hline{transform-origin:left;transform:scaleX(0)}
+</style>
+</head>
+<body>
+
+<!-- 报头 -->
+<header class="masthead">
+  <div class="mast-title">
+    <h1>觅图</h1>
+    <span class="lat">MITU · AI IMAGE WORKBENCH</span>
+  </div>
+  <div class="mast-meta">
+    <div class="cell"><span class="k">STATUS</span><span class="v blue">已连接</span></div>
+    <div class="cell"><span class="k">BALANCE</span><span class="v">¥ 127.40</span></div>
+    <div class="cell"><span class="k">本月已用</span><span class="v">¥ 86.20</span></div>
+    <div class="cell"><span class="k">今日生成</span><span class="v">12 张</span></div>
+  </div>
+</header>
+
+<!-- 导航行 -->
+<nav class="navline">
+  <a href="#">概览</a>
+  <a href="#" class="on">图片生成</a>
+  <a href="#">生成历史</a>
+  <a href="#">案例展示</a>
+  <a href="#">元数据</a>
+  <a href="#">实时监控</a>
+  <span class="nav-shortcut"><b>Ctrl</b>+<b>Enter</b> 快速生成</span>
+</nav>
+
+<!-- 主栅格 -->
+<main class="grid">
+  <!-- 左：提示词与控制 -->
+  <section class="col-l">
+    <div class="flabel rv"><span>提示词 PROMPT</span><span class="cnt">44 / 4,000</span></div>
+    <div class="prompt-area rv">
+      <textarea>人类文明进化史，螺旋塔构图，从农耕文明到星际远航，史诗感光影，博物馆级插画，暖金与深蓝</textarea>
+      <div class="rule hline"><i></i></div>
+    </div>
+
+    <div class="recent rv">
+      <div class="flabel" style="margin-bottom:4px"><span>最近使用 RECENT</span><span class="cnt">历史记录</span></div>
+      <div class="row"><span class="t">人类文明进化史，螺旋塔构图，从农耕文明到星际远航</span><span class="m">gpt-image-2 · 09:41</span></div>
+      <div class="row"><span class="t">萌系云朵毛绒玩偶，柔和糖果渐变，3D 渲染，影棚柔光</span><span class="m">gpt-image-2 · 09:40</span></div>
+      <div class="row"><span class="t">植物从种子到果实的完整生命周期，复古科学插画风格</span><span class="m">dall-e-3 · 09:36</span></div>
+      <div class="row"><span class="t">西装老人手持武士刀，高对比黑白肖像，硬光</span><span class="m">gpt-image-1 · 09:33</span></div>
+    </div>
+
+    <div class="controls rv">
+      <div class="ctrl">
+        <div class="k">MODEL 模型</div>
+        <div class="v">GPT Image 2 <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="sub">推荐 · 即时返回</div>
+      </div>
+      <div class="ctrl">
+        <div class="k">RATIO 比例</div>
+        <div class="v">1:1 <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="sub">正方形</div>
+      </div>
+      <div class="ctrl">
+        <div class="k">QUALITY 清晰度</div>
+        <div class="v">2K <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="sub">约 2MP 高清</div>
+      </div>
+      <div class="ctrl">
+        <div class="k">COUNT 数量</div>
+        <div class="v">4 张 <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="sub">单次并行</div>
+      </div>
+    </div>
+
+    <div class="gen-row rv">
+      <button class="btn-gen">生成 GENERATE</button>
+      <p class="gen-note">分组 <b>default</b> · 费率 <b>0.0735</b> / 张<br>预计耗时 6-10 秒</p>
+    </div>
+  </section>
+
+  <!-- 右：输出 -->
+  <section class="col-r">
+    <div class="flabel rv"><span>输出 OUTPUT</span><span class="cnt">最新一批</span></div>
+    <div class="out-hero rv">
+      <div class="frame"><img src="assets/case89.jpg" alt=""></div>
+      <span class="tag">JUST NOW</span>
+    </div>
+    <div class="out-cap rv">
+      <p class="p">人类文明进化史，螺旋塔构图，从农耕文明到星际远航，史诗感光影</p>
+      <span class="m">1024² · 6.4s</span>
+    </div>
+    <div class="genline rv">
+      <span class="gk">生成中 GENERATING</span>
+      <span class="gbar"><i></i></span>
+      <span class="gv">42% · 2K · 剩余约 4s</span>
+    </div>
+    <div class="out-row">
+      <div class="out-cell rv"><div class="th"><img src="assets/case47.jpg" alt=""></div><div class="t">广告拼贴 · 商业排版</div></div>
+      <div class="out-cell rv"><div class="th"><img src="assets/case58.jpg" alt=""></div><div class="t">城市光流 · 数字艺术</div></div>
+      <div class="out-cell rv"><div class="th"><img src="assets/case95.jpg" alt=""></div><div class="t">直播封面 · 二次元</div></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>
+gsap.defaults({ease:'power3.out',duration:.9});
+const tl = gsap.timeline({delay:.12});
+tl.fromTo('.mast-title h1',{yPercent:60,opacity:0},{yPercent:0,opacity:1,duration:1,ease:'power4.out'})
+  .to('.masthead .lat',{opacity:1,duration:.6},.3)
+  .to('.mast-meta .cell',{opacity:1,x:0,stagger:.08,duration:.6,startAt:{x:14}},.35)
+  .to('.navline',{opacity:1,duration:.5},.45)
+  .to('.hline',{scaleX:1,duration:1,ease:'power4.inOut'},.5)
+  .to('.col-l .rv',{opacity:1,y:0,stagger:.1,duration:.7,startAt:{y:16}},.55)
+  .to('.col-r .rv',{opacity:1,y:0,stagger:.09,duration:.7,startAt:{y:16}},.7)
+  .fromTo('.out-hero .frame img',{scale:1.12},{scale:1,duration:1.4,ease:'power2.out'},.7);
+</script>
+</body>
+</html>

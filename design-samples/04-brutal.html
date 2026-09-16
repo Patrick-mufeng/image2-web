@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>觅图 mitu · 样板 4 新粗野 Neo-Brutalist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   样板 4 · 新粗野 Neo-Brutalist
+   真黑粗边 + 硬投影，电光黄主导块面，
+   橙色只做激活态。诚实、响亮、手工感。
+   ═══════════════════════════════════════════════ */
+:root{
+  --canvas:#EDEDE8;        /* 中性灰白，非暖米 */
+  --panel:#FFFFFF;
+  --black:#111111;
+  --yellow:#FFD02F;        /* 电光黄 */
+  --orange:#FF4D00;        /* 热橙，仅激活 */
+  --gray:#6E6E66;
+  --disp:'Space Grotesk','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  --bd:2px solid var(--black);
+  --hard:5px 5px 0 var(--black);
+  --hard-sm:3px 3px 0 var(--black);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--canvas);color:var(--black);
+  font-family:var(--disp);font-size:14px;
+  overflow:hidden;display:flex;flex-direction:column;
+}
+::selection{background:var(--yellow)}
+
+/* ── 顶栏 ─────────────────────────────── */
+.topbar{
+  flex:none;height:64px;background:var(--panel);
+  border-bottom:var(--bd);
+  display:flex;align-items:stretch;
+}
+.brand{
+  display:flex;align-items:center;gap:12px;
+  padding:0 22px;border-right:var(--bd);
+  background:var(--black);
+}
+.brand .mark{
+  width:30px;height:30px;background:var(--yellow);
+  border:2px solid var(--yellow);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:15px;color:var(--black);
+}
+.brand b{color:#fff;font-size:16px;letter-spacing:.01em}
+.brand span{color:var(--yellow);font-size:10px;letter-spacing:.24em;display:block;margin-top:1px}
+.nav{display:flex;align-items:stretch}
+.nav a{
+  display:flex;align-items:center;padding:0 20px;
+  color:var(--black);text-decoration:none;font-weight:600;font-size:13.5px;
+  border-right:var(--bd);
+  transition:background .15s;
+}
+.nav a:hover{background:var(--yellow)}
+.nav a.on{background:var(--yellow);box-shadow:inset 0 -4px 0 var(--black)}
+.top-right{margin-left:auto;display:flex;align-items:stretch}
+.stat{
+  display:flex;flex-direction:column;justify-content:center;
+  padding:0 20px;border-left:var(--bd);
+}
+.stat .k{font-size:10px;letter-spacing:.18em;color:var(--gray)}
+.stat .v{font-weight:700;font-size:14.5px}
+.stat.hot{background:var(--yellow)}
+.stat.hot .k{color:rgba(0,0,0,.55)}
+
+/* ── 主区 ─────────────────────────────── */
+.work{
+  flex:1;display:grid;grid-template-columns:460px 1fr;
+  gap:22px;padding:22px;min-height:0;
+}
+.work > *{min-height:0}
+
+/* 左：控制台 */
+.board{display:flex;flex-direction:column;gap:16px;min-height:0}
+.panel{background:var(--panel);border:var(--bd);box-shadow:var(--hard)}
+.panel-h{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 16px;border-bottom:var(--bd);background:var(--panel);
+}
+.panel-h b{font-size:13px;letter-spacing:.06em}
+.panel-h .tag{
+  font-size:10px;font-weight:700;letter-spacing:.14em;
+  background:var(--black);color:var(--yellow);padding:3px 9px;
+}
+.prompt-panel{flex:1;display:flex;flex-direction:column}
+.prompt-panel textarea{
+  flex:1;resize:none;border:none;outline:none;background:var(--panel);
+  font-family:var(--disp);font-size:15.5px;line-height:1.75;font-weight:500;
+  padding:16px;color:var(--black);min-height:96px;
+}
+.prompt-panel textarea::placeholder{color:#B9B9B0}
+.count-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 16px;border-top:var(--bd);background:var(--canvas);
+}
+.count-row span{font-size:11px;color:var(--gray);font-weight:600;letter-spacing:.06em}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px}
+.pill{
+  font-size:12.5px;font-weight:600;padding:8px 14px;
+  border:var(--bd);background:var(--panel);cursor:pointer;
+  box-shadow:var(--hard-sm);
+  transition:transform .12s,box-shadow .12s,background .12s;
+}
+.pill:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--black)}
+.pill:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--black)}
+.pill.on{background:var(--yellow)}
+.pill-l{
+  width:100%;font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gray);
+  margin:4px 0 -2px;
+}
+.btn-gen{
+  height:62px;border:var(--bd);cursor:pointer;
+  background:var(--yellow);color:var(--black);
+  font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:.05em;
+  box-shadow:7px 7px 0 var(--black);
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  transition:transform .13s,box-shadow .13s,background .15s;
+}
+.btn-gen:hover{transform:translate(-3px,-3px);box-shadow:10px 10px 0 var(--black)}
+.btn-gen:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--black)}
+.btn-gen .arr{font-weight:700}
+.gen-meta{
+  display:flex;gap:10px;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:600;color:var(--gray);letter-spacing:.04em;
+}
+.gen-meta b{color:var(--black)}
+
+/* 右：结果墙 */
+.wall{
+  background:var(--panel);border:var(--bd);box-shadow:var(--hard);
+  display:flex;flex-direction:column;min-height:0;
+}
+.wall-h{
+  display:flex;align-items:center;gap:14px;
+  padding:11px 18px;border-bottom:var(--bd);
+}
+.wall-h b{font-size:13px;letter-spacing:.06em}
+.wall-h .badge{
+  font-size:10px;font-weight:700;letter-spacing:.14em;
+  background:var(--orange);color:#fff;padding:4px 10px;border:var(--bd);
+}
+.wall-h .meta{margin-left:auto;font-size:11px;font-weight:600;color:var(--gray)}
+.wall-grid{
+  flex:1;min-height:0;display:grid;
+  grid-template-columns:1.5fr 1fr;grid-template-rows:1fr 1fr;gap:16px;
+  padding:16px;
+}
+.wall-grid > *{min-height:0}
+.card{
+  border:var(--bd);background:var(--canvas);overflow:hidden;position:relative;
+  box-shadow:var(--hard-sm);cursor:pointer;
+  transition:transform .16s,box-shadow .16s;
+}
+.card:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--black)}
+.card.big{grid-row:1/3}
+.card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.card .strip{
+  position:absolute;left:0;right:0;bottom:0;
+  background:var(--panel);border-top:var(--bd);
+  padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.card .strip .t{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .strip .m{font-size:10px;font-weight:600;color:var(--gray);white-space:nowrap}
+.card .no{
+  position:absolute;top:0;left:0;background:var(--black);color:#fff;
+  font-size:10px;font-weight:700;letter-spacing:.1em;padding:4px 10px;
+}
+/* 生成中卡片 */
+.card.gen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:repeating-linear-gradient(45deg,var(--yellow) 0 14px,#FFDA5E 14px 28px);
+}
+.card.gen .gt{
+  background:var(--panel);border:var(--bd);padding:8px 16px;
+  font-weight:700;font-size:14px;box-shadow:var(--hard-sm);
+}
+.card.gen .gm{font-size:10.5px;font-weight:700;letter-spacing:.08em;background:var(--black);color:var(--yellow);padding:4px 10px}
+
+/* 底部快捷条 */
+.shortcut{
+  flex:none;background:var(--black);color:var(--canvas);
+  display:flex;align-items:center;justify-content:center;gap:26px;
+  height:38px;font-size:11px;font-weight:600;letter-spacing:.06em;
+}
+.shortcut b{color:var(--yellow);border:1px solid var(--yellow);padding:1px 7px;margin-right:6px;font-weight:700}
+
+/* 入场初始态 */
+.rv{opacity:0}
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<header class="topbar rv">
+  <div class="brand">
+    <div class="mark">觅</div>
+    <div><b>觅图 mitu</b><span>AI WORKBENCH</span></div>
+  </div>
+  <nav class="nav">
+    <a href="#">概览</a>
+    <a href="#" class="on">图片生成</a>
+    <a href="#">生成历史</a>
+    <a href="#">案例展示</a>
+    <a href="#">元数据</a>
+    <a href="#">实时监控</a>
+  </nav>
+  <div class="top-right">
+    <div class="stat"><span class="k">STATUS</span><span class="v">已连接</span></div>
+    <div class="stat"><span class="k">BALANCE</span><span class="v">¥ 127.40</span></div>
+    <div class="stat hot"><span class="k">今日已生成</span><span class="v">12 张</span></div>
+  </div>
+</header>
+
+<!-- 主区 -->
+<main class="work">
+  <!-- 左：控制台 -->
+  <section class="board">
+    <div class="panel prompt-panel rv">
+      <div class="panel-h"><b>提示词 PROMPT</b><span class="tag">TXT → IMG</span></div>
+      <textarea>人类文明进化史，螺旋塔构图，从农耕文明到星际远航，史诗感光影，博物馆级插画，暖金与深蓝</textarea>
+      <div class="count-row"><span>44 / 4,000 字符</span><span>Ctrl + Enter 快速生成</span></div>
+    </div>
+
+    <div class="panel rv">
+      <div class="panel-h"><b>参数 PARAMS</b><span class="tag">gpt-image-2</span></div>
+      <div class="pill-row">
+        <span class="pill-l">比例 RATIO</span>
+        <button class="pill">1:1</button>
+        <button class="pill on">16:9</button>
+        <button class="pill">9:16</button>
+        <button class="pill">4:3</button>
+        <button class="pill">3:4</button>
+        <span class="pill-l">清晰度 QUALITY</span>
+        <button class="pill">1MP</button>
+        <button class="pill on">2K</button>
+        <button class="pill">4K</button>
+        <span class="pill-l">数量 COUNT</span>
+        <button class="pill">2 张</button>
+        <button class="pill on">4 张</button>
+      </div>
+    </div>
+
+    <div class="rv">
+      <button class="btn-gen">开始生成 <span class="arr">→</span></button>
+      <div class="gen-meta" style="margin-top:12px">分组 <b>default</b> · 费率 <b>0.0735</b> / 张 · 预计 <b>6-10s</b></div>
+    </div>
+  </section>
+
+  <!-- 右：结果墙 -->
+  <section class="wall rv">
+    <div class="wall-h">
+      <b>输出 OUTPUT</b>
+      <span class="badge">LIVE</span>
+      <span class="meta">本批 2 / 4 完成 · 剩余约 9s</span>
+    </div>
+    <div class="wall-grid">
+      <div class="card big">
+        <img src="assets/case89.jpg" alt="">
+        <span class="no">NO.01</span>
+        <div class="strip"><span class="t">文明进化 · 螺旋塔</span><span class="m">2048×1152 · 6.4s</span></div>
+      </div>
+      <div class="card" style="transform:rotate(-.6deg)">
+        <img src="assets/case118.jpg" alt="">
+        <span class="no">NO.02</span>
+        <div class="strip"><span class="t">黑白肖像 · 武士老人</span><span class="m">2048×1152 · 5.2s</span></div>
+      </div>
+      <div class="card gen">
+        <div class="gt">生成中 42%</div>
+        <div class="gm">2K · 已用 12S</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 底部快捷条 -->
+<footer class="shortcut rv">
+  <span><b>Ctrl</b>Enter 快速生成</span>
+  <span><b>Ctrl</b>1-6 切换页面</span>
+  <span><b>拖拽</b>上传参考图</span>
+  <span><b>双击</b>图片查看大图</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>
+gsap.defaults({ease:'power3.out',duration:.8});
+const tl = gsap.timeline({delay:.12});
+tl.to('.topbar',{opacity:1,y:0,duration:.6,ease:'back.out(1.4)',startAt:{y:-46}})
+  .to('.board .rv',{opacity:1,y:0,stagger:.12,duration:.7,ease:'back.out(1.2)',startAt:{y:34,x:-14}},.25)
+  .to('.btn-gen',{opacity:1,y:0,duration:.55,ease:'back.out(2)',startAt:{y:24}},.6)
+  .to('.wall',{opacity:1,x:0,duration:.7,startAt:{x:30}},.35)
+  .to('.shortcut',{opacity:1,duration:.6},.7)
+  .fromTo('.card',{opacity:0,y:26},{opacity:1,y:0,stagger:.1,duration:.6,
+    onStart(){},complete(){}},.55);
+</script>
+</body>
+</html>

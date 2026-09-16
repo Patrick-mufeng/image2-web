@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>觅图 mitu · 样板 1 暗房 Darkroom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   样板 1 · 暗房 Darkroom
+   图片是唯一的主角。画廊墙式的留白，暖炭底色，
+   琥珀安全灯作唯一强调色。命令行式的底部生成条。
+   ═══════════════════════════════════════════════ */
+:root{
+  --bg:#141210;            /* 暖炭黑 */
+  --bg-deep:#0E0C0A;
+  --panel:#1B1815;
+  --line:#2B2723;          /* 发丝线 */
+  --line-soft:#221F1B;
+  --ink:#EDE7DE;           /* 暖白 */
+  --ink-dim:#9A9083;       /* 暖灰 */
+  --ink-faint:#5F574C;
+  --amber:#E8A33D;         /* 安全灯琥珀 */
+  --amber-soft:rgba(232,163,61,.14);
+  --disp:'Sora','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  --mono:'Cascadia Code','Consolas',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--disp);
+  font-size:14px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+::selection{background:var(--amber);color:#141210}
+
+/* ── 顶部状态带 ─────────────────────────── */
+.topbar{
+  height:64px;flex:none;
+  display:flex;align-items:center;gap:32px;
+  padding:0 28px;
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand-mark{
+  width:26px;height:26px;border-radius:50%;
+  background:radial-gradient(circle at 38% 34%, #F5C46B 0%, var(--amber) 42%, #7A4E12 100%);
+  align-self:center;
+  box-shadow:0 0 18px rgba(232,163,61,.35);
+}
+.brand-name{font-weight:800;font-size:17px;letter-spacing:.02em}
+.brand-sub{font-size:11px;color:var(--ink-faint);letter-spacing:.22em}
+.nav{display:flex;gap:4px;margin-left:12px}
+.nav a{
+  color:var(--ink-dim);text-decoration:none;
+  font-size:13px;padding:8px 14px;border-radius:999px;
+  transition:color .25s,background .25s;
+}
+.nav a:hover{color:var(--ink)}
+.nav a.on{color:#141210;background:var(--amber);font-weight:600}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:20px}
+.live{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--ink-dim)}
+.live i{
+  width:7px;height:7px;border-radius:50%;background:#5BC98C;
+  box-shadow:0 0 8px rgba(91,201,140,.7);
+  animation:breath 2.6s ease-in-out infinite;
+}
+@keyframes breath{50%{opacity:.45}}
+.balance{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint)}
+.balance b{color:var(--ink);font-weight:600}
+
+/* ── 主区：画布 + 片单 ───────────────────── */
+.stage{
+  flex:1;display:grid;
+  grid-template-columns:1fr 300px;
+  gap:0;min-height:0;
+}
+.canvas-zone{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:40px 56px;min-width:0;position:relative;
+}
+.mat{
+  position:relative;
+  max-width:760px;width:100%;
+}
+.mat-frame{
+  aspect-ratio:1/1;max-height:56vh;margin:0 auto;width:auto;
+  border-radius:4px;overflow:hidden;position:relative;
+  box-shadow:0 30px 80px rgba(0,0,0,.55), 0 4px 18px rgba(0,0,0,.4);
+  background:var(--bg-deep);
+}
+.mat-frame img{width:100%;height:100%;object-fit:cover;display:block;object-position:50% 24%}
+.mat-frame::after{ /* 画廊玻璃的微弱反光 */
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(118deg, rgba(255,255,255,.05) 0%, transparent 24%);
+  pointer-events:none;
+}
+.caption{
+  margin-top:22px;text-align:center;max-width:640px;
+}
+.caption .cap-prompt{
+  font-size:13.5px;line-height:1.7;color:var(--ink-dim);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.caption .cap-meta{
+  margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--ink-faint);
+  display:flex;justify-content:center;gap:18px;
+}
+.caption .cap-meta em{font-style:normal;color:var(--amber)}
+
+/* 右侧片单 */
+.strip{
+  border-left:1px solid var(--line-soft);
+  padding:26px 22px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:18px;
+}
+.strip-h{
+  font-size:11px;letter-spacing:.24em;color:var(--ink-faint);
+  padding-bottom:12px;border-bottom:1px solid var(--line-soft);
+  display:flex;justify-content:space-between;
+}
+.shot{display:flex;gap:12px;align-items:center;cursor:pointer}
+.shot .thumb{
+  width:64px;height:64px;border-radius:3px;overflow:hidden;flex:none;
+  background:var(--panel);position:relative;
+  transition:transform .3s cubic-bezier(.16,1,.3,1);
+}
+.shot:hover .thumb{transform:translateY(-2px) scale(1.03)}
+.shot .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.shot .s-meta{min-width:0}
+.shot .s-t{font-size:12px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shot .s-m{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:4px}
+.shot.cur .s-t{color:var(--ink)}
+.shot.cur .thumb{outline:1px solid var(--amber);outline-offset:2px}
+/* 生成中的槽位 */
+.shot.gen .thumb{display:flex;align-items:center;justify-content:center;background:var(--panel)}
+.shot.gen .pct{font-family:var(--mono);font-size:13px;color:var(--amber)}
+.shot.gen .thumb::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 30%,rgba(232,163,61,.12) 50%,transparent 70%);
+  animation:sweep 1.6s linear infinite;
+}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* ── 底部命令条 ─────────────────────────── */
+.cmd{
+  flex:none;border-top:1px solid var(--line);
+  background:var(--bg-deep);
+  display:flex;align-items:center;gap:14px;
+  padding:16px 28px;
+}
+.chip{
+  font-family:var(--mono);font-size:12px;color:var(--ink-dim);
+  border:1px solid var(--line);border-radius:6px;
+  padding:9px 14px;cursor:pointer;white-space:nowrap;
+  transition:border-color .25s,color .25s;
+}
+.chip:hover{border-color:var(--ink-faint);color:var(--ink)}
+.chip b{color:var(--ink);font-weight:600;margin-left:6px}
+.chip b.am{color:var(--amber)}
+.cmd-input{
+  flex:1;display:flex;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:0 16px;height:46px;
+  transition:border-color .25s;
+}
+.cmd-input:focus-within{border-color:var(--amber)}
+.cmd-input .cursor-tip{font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+.cmd-input input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--ink);font-family:var(--disp);font-size:14px;
+}
+.cmd-input input::placeholder{color:var(--ink-faint)}
+.btn-gen{
+  height:46px;padding:0 34px;border:none;border-radius:8px;cursor:pointer;
+  background:var(--amber);color:#141210;
+  font-family:var(--disp);font-weight:700;font-size:14.5px;letter-spacing:.04em;
+  display:flex;align-items:center;gap:9px;
+  transition:transform .2s cubic-bezier(.16,1,.3,1),box-shadow .3s;
+  box-shadow:0 0 0 rgba(232,163,61,0);
+}
+.btn-gen:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(232,163,61,.35)}
+.btn-gen:active{transform:translateY(0) scale(.98)}
+.btn-gen svg{width:15px;height:15px}
+.kbd-hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);text-align:center;padding:0 28px 10px}
+.kbd-hint span{border:1px solid var(--line);border-radius:4px;padding:1px 5px;margin:0 2px}
+
+/* 入场动画初始态 */
+.rv{opacity:0}
+</style>
+</head>
+<body>
+
+<!-- 顶部状态带 -->
+<header class="topbar rv">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <span class="brand-name">觅图</span>
+    <span class="brand-sub">MITU · 暗房</span>
+  </div>
+  <nav class="nav">
+    <a href="#">概览</a>
+    <a href="#" class="on">图片生成</a>
+    <a href="#">生成历史</a>
+    <a href="#">案例展示</a>
+    <a href="#">元数据</a>
+    <a href="#">实时监控</a>
+  </nav>
+  <div class="top-right">
+    <div class="live"><i></i>已连接 · OpenLux</div>
+    <div class="balance">余额 <b>¥ 127.40</b>　本月 <b>¥ 86.20</b></div>
+  </div>
+</header>
+
+<!-- 主区 -->
+<main class="stage">
+  <section class="canvas-zone">
+    <div class="mat">
+      <figure class="mat-frame rv">
+        <img src="assets/case89.jpg" alt="最新生成">
+      </figure>
+      <figcaption class="caption rv">
+        <p class="cap-prompt">人类文明进化史，螺旋塔构图，从农耕文明到星际远航，史诗感光影，博物馆级插画，暖金与深蓝</p>
+        <div class="cap-meta">
+          <span>gpt-image-2</span><span>1024 × 1024</span><span><em>6.4s</em></span><span>今天 09:41</span>
+        </div>
+      </figcaption>
+    </div>
+  </section>
+
+  <aside class="strip rv">
+    <div class="strip-h"><span>本批生成</span><span>04 / 04</span></div>
+
+    <div class="shot gen">
+      <div class="thumb"><span class="pct">42%</span></div>
+      <div class="s-meta">
+        <div class="s-t">生成中 · 4K 超清</div>
+        <div class="s-m">gpt-image-2 · 已用 12s</div>
+      </div>
+    </div>
+    <div class="shot cur">
+      <div class="thumb"><img src="assets/case89.jpg" alt=""></div>
+      <div class="s-meta">
+        <div class="s-t">文明进化 · 螺旋塔</div>
+        <div class="s-m">1024² · 6.4s · 09:41</div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="thumb"><img src="assets/case33.jpg" alt=""></div>
+      <div class="s-meta">
+        <div class="s-t">萌系云朵玩偶 · 3D</div>
+        <div class="s-m">1024² · 5.8s · 09:40</div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="thumb"><img src="assets/case118.jpg" alt=""></div>
+      <div class="s-meta">
+        <div class="s-t">黑白肖像 · 武士老人</div>
+        <div class="s-m">2K · 8.1s · 09:38</div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="thumb"><img src="assets/case72.jpg" alt=""></div>
+      <div class="s-meta">
+        <div class="s-t">植物图谱 · 复古科普</div>
+        <div class="s-m">1024² · 4.9s · 09:36</div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="thumb"><img src="assets/case58.jpg" alt=""></div>
+      <div class="s-meta">
+        <div class="s-t">城市光流 · 数字艺术</div>
+        <div class="s-m">1024² · 6.0s · 09:33</div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- 底部命令条 -->
+<footer class="cmd rv">
+  <div class="chip">模型<b class="am">GPT Image 2</b></div>
+  <div class="chip">比例<b>1:1</b></div>
+  <div class="chip">清晰度<b>2K</b></div>
+  <div class="chip">数量<b>4</b></div>
+  <div class="cmd-input">
+    <span class="cursor-tip">&gt;_</span>
+    <input type="text" placeholder="描述你想要的画面，回车即出片…" value="人类文明进化史，螺旋塔构图，从农耕文明到星际远航">
+  </div>
+  <button class="btn-gen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    生成
+  </button>
+</footer>
+<div class="kbd-hint rv"><span>Ctrl</span>+<span>Enter</span> 快速生成　<span>Ctrl</span>+<span>1-6</span> 切换页面</div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>
+gsap.defaults({ease:'power3.out',duration:1});
+const tl = gsap.timeline({delay:.15});
+tl.to('.topbar',{opacity:1,y:0,duration:.7,startAt:{y:-10}})
+  .to('.cmd',{opacity:1,y:0,duration:.7,startAt:{y:14}},.1)
+  .to('.kbd-hint',{opacity:1,duration:.6},.3)
+  .fromTo('.mat-frame',
+    {opacity:0,scale:1.045,clipPath:'inset(12% 8% 12% 8%)'},
+    {opacity:1,scale:1,clipPath:'inset(0% 0% 0% 0%)',duration:1.3,ease:'power2.out'},.25)
+  .to('.caption',{opacity:1,y:0,duration:.8,startAt:{y:12}},.7)
+  .to('.strip',{opacity:1,x:0,duration:.9,startAt:{x:24}},.5)
+  .fromTo('.shot',{opacity:0,x:18},{opacity:1,x:0,stagger:.07,duration:.6},.65);
+</script>
+</body>
+</html>

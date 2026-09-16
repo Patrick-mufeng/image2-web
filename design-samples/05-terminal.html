@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>觅图 mitu · 样板 5 终端座舱 Terminal Cockpit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   样板 5 · 终端座舱 Terminal Cockpit
+   全等宽字体。磷光青柠做唯一强调，
+   键值式参数、日志流、光标闪烁。键盘优先的仪器台。
+   ═══════════════════════════════════════════════ */
+:root{
+  --bg:#0B0D0A;            /* 磷光黑 */
+  --bg-2:#0F120D;
+  --line:#1E241B;
+  --ink:#D8E4C8;           /* 荧灰绿 */
+  --ink-2:#8B9A7B;
+  --ink-3:#54604A;
+  --lime:#C8F04A;          /* 磷光青柠，唯一强调 */
+  --lime-dim:rgba(200,240,74,.14);
+  --mono:'JetBrains Mono','Cascadia Code','Microsoft YaHei UI',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--mono);font-size:13px;
+  overflow:hidden;display:flex;flex-direction:column;
+}
+::selection{background:var(--lime);color:#0B0D0A}
+
+/* ── 顶部状态条 ───────────────────────── */
+.statusbar{
+  flex:none;height:42px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;padding:0 18px;gap:0;
+  font-size:11.5px;letter-spacing:.02em;background:var(--bg-2);
+}
+.statusbar .path{color:var(--lime);font-weight:700}
+.statusbar .path span{color:var(--ink-3)}
+.sb-item{padding:0 16px;border-left:1px solid var(--line);color:var(--ink-2)}
+.sb-item b{color:var(--ink);font-weight:600}
+.sb-item.ok b{color:var(--lime)}
+.sb-right{margin-left:auto;display:flex;align-items:center;height:100%}
+.sb-right .sb-item:last-child{border-right:1px solid var(--line)}
+.blink{animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ── 主体 ─────────────────────────────── */
+.body{flex:1;display:grid;grid-template-columns:212px 1fr;min-height:0}
+
+/* 左侧导航 */
+.side{border-right:1px solid var(--line);padding:18px 0;display:flex;flex-direction:column}
+.side .sec{
+  font-size:10px;letter-spacing:.24em;color:var(--ink-3);padding:0 18px;margin-bottom:10px;
+}
+.side a{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 18px;color:var(--ink-2);text-decoration:none;font-size:12.5px;
+  border-left:2px solid transparent;
+  transition:background .15s,color .15s;
+}
+.side a:hover{color:var(--ink);background:rgba(200,240,74,.04)}
+.side a.on{
+  color:var(--lime);background:var(--lime-dim);border-left-color:var(--lime);font-weight:600;
+}
+.side a.on::before{content:"▸";font-size:11px}
+.side a:not(.on)::before{content:"·";color:var(--ink-3)}
+.side-foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--line);font-size:10.5px;color:var(--ink-3);line-height:2}
+.side-foot b{color:var(--ink-2);font-weight:600}
+
+/* 右侧工作区 */
+.work{display:flex;flex-direction:column;min-width:0;min-height:0}
+
+/* 命令区 */
+.cmd{border-bottom:1px solid var(--line);padding:22px 24px 18px;background:var(--bg-2)}
+.cmd-title{font-size:11px;letter-spacing:.24em;color:var(--ink-3);margin-bottom:14px;display:flex;justify-content:space-between}
+.cmd-title .sc{letter-spacing:.05em}
+.cmd-title .sc b{color:var(--ink-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;font-weight:600}
+.cmd-line{display:flex;align-items:flex-start;gap:12px}
+.cmd-prompt{color:var(--lime);font-weight:700;white-space:nowrap;padding-top:2px}
+.cmd-text{font-size:15px;line-height:1.75;color:var(--ink);font-weight:500;max-width:70ch}
+.cmd-caret{
+  display:inline-block;width:9px;height:19px;background:var(--lime);
+  vertical-align:-3px;margin-left:2px;
+}
+.params{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:18px;font-size:12px}
+.param{display:flex;align-items:center;gap:9px;color:var(--ink-3)}
+.param .k{letter-spacing:.14em;font-size:10px}
+.param .opts{display:flex;gap:4px}
+.param .opt{padding:4px 10px;border:1px solid var(--line);color:var(--ink-2);cursor:pointer;transition:all .15s}
+.param .opt:hover{border-color:var(--ink-3);color:var(--ink)}
+.param .opt.on{background:var(--lime);border-color:var(--lime);color:#0B0D0A;font-weight:700}
+.cmd-actions{margin-top:18px;display:flex;align-items:center;gap:18px}
+.btn-run{
+  font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.06em;
+  background:var(--lime);color:#0B0D0A;border:1px solid var(--lime);
+  padding:11px 30px;cursor:pointer;
+  transition:all .15s;
+}
+.btn-run:hover{background:#D9FA6A;box-shadow:0 0 24px rgba(200,240,74,.35)}
+.btn-run:active{transform:translateY(1px)}
+.run-meta{font-size:11px;color:var(--ink-3)}
+.run-meta b{color:var(--ink-2);font-weight:600}
+
+/* 输出区 */
+.out{flex:1;min-height:0;display:flex;flex-direction:column}
+.out-h{
+  display:flex;align-items:center;gap:14px;
+  padding:12px 24px;border-bottom:1px solid var(--line);
+  font-size:11px;letter-spacing:.2em;color:var(--ink-3);
+}
+.out-h .fill{color:var(--lime)}
+.out-h .right{margin-left:auto;letter-spacing:.04em}
+.out-grid{
+  flex:1;min-height:0;display:grid;
+  grid-template-columns:1.55fr 1fr 1fr;grid-template-rows:minmax(0,1fr);gap:14px;padding:16px 24px;
+}
+.out-grid > *{min-height:0}
+.cell{border:1px solid var(--line);background:var(--bg-2);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.cell .img{flex:1;min-height:0;overflow:hidden;position:relative;background:#0E100C}
+.cell .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+  transition:transform .5s cubic-bezier(.16,1,.3,1);filter:saturate(.92)}
+.cell:hover .img img{transform:scale(1.035);filter:saturate(1)}
+.cell .bar{
+  flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border-top:1px solid var(--line);padding:8px 12px;font-size:10.5px;color:var(--ink-3);
+}
+.cell .bar .t{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .bar .idx{color:var(--lime);font-weight:700}
+.cell.gen .img{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.cell.gen .spin{font-size:26px;color:var(--lime);letter-spacing:2px}
+.cell.gen .gpct{font-size:12px;color:var(--ink-2)}
+.cell.gen .gpct b{color:var(--lime)}
+.cell.gen .img::after{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(200,240,74,.025) 3px 4px);
+  pointer-events:none;
+}
+
+/* 日志流 */
+.logs{
+  flex:none;height:160px;border-top:1px solid var(--line);
+  padding:10px 24px 12px;overflow:hidden;background:var(--bg-2);
+  font-size:11.5px;line-height:1.9;
+}
+.logs .lh{font-size:10px;letter-spacing:.24em;color:var(--ink-3);margin-bottom:6px;display:flex;justify-content:space-between}
+.log{color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log .ts{color:var(--ink-3);margin-right:10px}
+.log .lv{margin-right:10px;font-weight:700}
+.log .lv.ok{color:var(--lime)}
+.log .lv.in{color:var(--ink-2)}
+.log .msg{color:var(--ink-2)}
+.log .msg b{color:var(--ink);font-weight:500}
+
+/* 入场初始态 */
+.rv{opacity:0}
+</style>
+</head>
+<body>
+
+<!-- 顶部状态条 -->
+<header class="statusbar rv">
+  <span class="path">觅图<span>://</span>生成器</span>
+  <span class="sb-item ok">API <b>OK</b></span>
+  <span class="sb-item">BAL <b>¥127.40</b></span>
+  <span class="sb-item">USED <b>¥86.20</b>/月</span>
+  <span class="sb-item">TODAY <b>12</b> 张</span>
+  <div class="sb-right">
+    <span class="sb-item">UPTIME <b>02:14:33</b></span>
+    <span class="sb-item">SESSION <b class="blink">▊</b></span>
+  </div>
+</header>
+
+<div class="body">
+  <!-- 左侧导航 -->
+  <aside class="side rv">
+    <div class="sec">WORKBENCH</div>
+    <a href="#">概览</a>
+    <a href="#" class="on">图片生成</a>
+    <a href="#">生成历史</a>
+    <a href="#">案例展示</a>
+    <a href="#">元数据</a>
+    <a href="#">实时监控</a>
+    <div class="side-foot">
+      MODEL <b>gpt-image-2</b><br>
+      GROUP <b>default · 0.0735</b><br>
+      KEY <b>sk-···f4c2</b>
+    </div>
+  </aside>
+
+  <!-- 工作区 -->
+  <main class="work">
+    <!-- 命令区 -->
+    <section class="cmd rv">
+      <div class="cmd-title">
+        <span>PROMPT // 输入指令</span>
+        <span class="sc"><b>Ctrl</b>+<b>Enter</b> 执行</span>
+      </div>
+      <div class="cmd-line">
+        <span class="cmd-prompt">gen&gt;</span>
+        <span class="cmd-text">人类文明进化史，螺旋塔构图，从农耕文明到星际远航，史诗感光影，博物馆级插画，暖金与深蓝<span class="cmd-caret"></span></span>
+      </div>
+      <div class="params">
+        <div class="param"><span class="k">MODEL</span>
+          <span class="opts"><span class="opt on">gpt-image-2</span><span class="opt">2-c</span><span class="opt">gpt-image-1</span><span class="opt">dall-e-3</span></span>
+        </div>
+        <div class="param"><span class="k">RATIO</span>
+          <span class="opts"><span class="opt on">1:1</span><span class="opt">16:9</span><span class="opt">9:16</span><span class="opt">4:3</span><span class="opt">3:4</span></span>
+        </div>
+        <div class="param"><span class="k">QUALITY</span>
+          <span class="opts"><span class="opt">1mp</span><span class="opt on">2k</span><span class="opt">4k</span></span>
+        </div>
+        <div class="param"><span class="k">COUNT</span>
+          <span class="opts"><span class="opt">2</span><span class="opt on">4</span></span>
+        </div>
+      </div>
+      <div class="cmd-actions">
+        <button class="btn-run">EXEC ▸ 生成</button>
+        <span class="run-meta">费率 <b>0.0735</b>/张 · 预计 <b>6-10s</b> · 上游 <b>OpenLux</b></span>
+      </div>
+    </section>
+
+    <!-- 输出区 -->
+    <section class="out rv">
+      <div class="out-h">
+        <span>OUTPUT // 本批结果</span>
+        <span class="fill">2/4 完成</span>
+        <span class="right">batch_20260830_0941 · 04 排队中</span>
+      </div>
+      <div class="out-grid">
+        <div class="cell">
+          <div class="img"><img src="assets/case89.jpg" alt=""></div>
+          <div class="bar"><span class="t">文明进化 · 螺旋塔</span><span><span class="idx">01</span> · 2048² · 6.4s</span></div>
+        </div>
+        <div class="cell">
+          <div class="img"><img src="assets/case118.jpg" alt=""></div>
+          <div class="bar"><span class="t">黑白肖像 · 武士老人</span><span><span class="idx">02</span> · 2048² · 5.2s</span></div>
+        </div>
+        <div class="cell gen">
+          <div class="img">
+            <span class="spin" id="spin">⠋</span>
+            <span class="gpct">生成中 <b>42%</b> · 2K · 已用 12s</span>
+          </div>
+          <div class="bar"><span class="t">03 · 2K 渲染中</span><span class="idx">RUN</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 日志流 -->
+    <section class="logs rv">
+      <div class="lh"><span>EVENT STREAM // 实时事件</span><span>AUTO-SCROLL ON</span></div>
+      <div class="log"><span class="ts">09:41:02.114</span><span class="lv in">REQ </span><span class="msg">POST /v1/images/generations · model=<b>gpt-image-2</b> · n=4 · size=<b>2048x2048</b></span></div>
+      <div class="log"><span class="ts">09:41:02.893</span><span class="lv ok">201 </span><span class="msg">任务已受理 · batch=<b>batch_20260830_0941</b> · 计费 ¥0.294</span></div>
+      <div class="log"><span class="ts">09:41:08.502</span><span class="lv ok">IMG </span><span class="msg">01/4 完成 · 6.4s · 已存 <b>data/images/</b></span></div>
+      <div class="log"><span class="ts">09:41:09.730</span><span class="lv ok">IMG </span><span class="msg">02/4 完成 · 5.2s · 已存 <b>data/images/</b></span></div>
+      <div class="log"><span class="ts">09:41:09.731</span><span class="lv in">QUE </span><span class="msg">04/4 排队等待渲染槽位<span class="blink" style="color:var(--lime)"> ▊</span></span></div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>
+gsap.defaults({ease:'power3.out',duration:.7});
+const tl = gsap.timeline({delay:.12});
+tl.to('.statusbar',{opacity:1,duration:.5})
+  .to('.side',{opacity:1,x:0,duration:.7,startAt:{x:-18}},.1)
+  .to('.cmd',{opacity:1,y:0,duration:.7,startAt:{y:-12}},.2)
+  .to('.out',{opacity:1,duration:.7},.35)
+  .to('.logs',{opacity:1,duration:.7},.45)
+  .fromTo('.log',{opacity:0,x:-10},{opacity:1,x:0,stagger:.14,duration:.4},.55)
+  .fromTo('.cell',{opacity:0,y:16},{opacity:1,y:0,stagger:.09,duration:.55},.45)
+  .fromTo('.cell .img img',{scale:1.08},{scale:1,duration:1.1,ease:'power2.out'},.5);
+
+/* 生成中的 braille 自旋 */
+const frames=['▖','▘','▝','▗'];
+let fi=0;
+setInterval(()=>{document.getElementById('spin').textContent=frames[fi=(fi+1)%frames.length]},160);
+</script>
+</body>
+</html>
