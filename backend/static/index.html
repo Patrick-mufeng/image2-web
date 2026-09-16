@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark" data-accent="ocean">
+<html lang="zh-CN" data-theme="light" data-accent="ocean">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>觅图 mitu — AI 图片生成</title>
   <meta name="description" content="集成 GPT Image 系列模型的一站式 AI 生图工作台：文生图、图生图、案例库、历史与实时监控。">
-  <link rel="stylesheet" href="/css/style.css?v=18">
+  <link rel="stylesheet" href="/css/style.css?v=46">
 </head>
 <body>
   <!-- ═══ SVG 图标库（线性 24×24 / stroke 1.7）═══ -->
@@ -38,24 +38,32 @@
   </svg>
 
   <div id="app">
-    <!-- ═══ Header ═══ -->
+    <!-- ═══ Header · 报头 ═══ -->
     <header class="hdr">
       <div class="hdr-l">
-        <div class="hdr-logo"><svg class="ic"><use href="#i-image"/></svg></div>
-        <span class="hdr-title">觅图 <em class="hdr-eng">mitu</em></span>
-        <span class="hdr-badge">AI 生图工作台</span>
+        <div class="mast-brand">
+          <span class="mast-title">觅图</span>
+          <span class="mast-lat">MITU · AI IMAGE WORKBENCH</span>
+        </div>
+      </div>
+      <div class="mast-meta">
+        <div class="mm-cell" id="apiStatus">
+          <span class="mm-k">STATUS</span>
+          <span class="mm-v"><span class="hdr-dot" id="statusDot"></span><span id="statusText">检查中</span></span>
+        </div>
+        <div class="mm-cell"><span class="mm-k">KEY 名称</span><span class="mm-v" id="hdrKeyName">-</span></div>
+        <div class="mm-cell"><span class="mm-k">BALANCE 余额</span><span class="mm-v accent" id="hdrBalance">-</span></div>
+        <div class="mm-cell"><span class="mm-k">本月已用</span><span class="mm-v" id="hdrUsage">-</span></div>
+        <div class="mm-cell"><span class="mm-k">今日生成</span><span class="mm-v" id="hdrToday">-</span></div>
       </div>
       <div class="hdr-r">
-        <span class="hdr-status" id="apiStatus">
-          <span class="hdr-dot" id="statusDot"></span>
-          <span id="statusText">检查中</span>
-        </span>
+        <span class="hdr-sep"></span>
         <div class="accent-sw" id="accentSw" role="group" aria-label="强调色">
-          <button class="accent-dot" data-accent="emerald" title="翡翠 Emerald" style="--dot:#23e2a0"></button>
-          <button class="accent-dot active" data-accent="ocean" title="静海 Ocean" style="--dot:#2aa9e8"></button>
-          <button class="accent-dot" data-accent="iris" title="鸢尾 Iris" style="--dot:#845ee7"></button>
-          <button class="accent-dot" data-accent="amber" title="琥珀 Amber" style="--dot:#e69d23"></button>
-          <button class="accent-dot" data-accent="sakura" title="绯樱 Sakura" style="--dot:#e0527c"></button>
+          <button class="accent-dot" data-accent="emerald" title="森林 Forest" style="--dot:#0E6B3F"></button>
+          <button class="accent-dot active" data-accent="ocean" title="钴蓝 Cobalt" style="--dot:#2438E8"></button>
+          <button class="accent-dot" data-accent="iris" title="墨黑 Ink" style="--dot:#16150F"></button>
+          <button class="accent-dot" data-accent="amber" title="赭石 Ochre" style="--dot:#A66A12"></button>
+          <button class="accent-dot" data-accent="sakura" title="瑞士红 Swiss Red" style="--dot:#C92B1C"></button>
         </div>
         <button class="btn btn-icon" id="btnSettings" title="API 设置" aria-label="API 设置">
           <svg class="ic"><use href="#i-settings"/></svg>
@@ -102,77 +110,62 @@
         </button>
         <div class="nav-footer">
           <span class="nav-author">觅图 mitu · OpenLux</span>
-          <span class="nav-version">V3.2 · 暗色静海</span>
+          <span class="nav-version">V3.2 · SWISS PAPER</span>
         </div>
       </nav>
 
       <!-- ─── Content ─── -->
       <main class="content">
 
-        <!-- ═══ TAB 0: 概览 Dashboard ═══ -->
+        <!-- ═══ TAB 0: 首页 · 凸版字标 ═══ -->
         <section class="tab-pane active" id="tab0">
-          <div class="page page-dash">
-            <div class="dash-top">
-              <h2 class="page-title">概览</h2>
-              <p class="page-desc">今天想生成点什么？</p>
+          <div class="page page-front">
+
+            <div class="hm-hero">
+              <div class="hm-orn" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+              <h1 class="hm-mark">觅图</h1>
+              <div class="hm-sub">MITU · AI IMAGE WORKBENCH · LETTERPRESS ON PAPER</div>
+              <div class="hm-jump">
+                <input type="text" id="homePrompt" placeholder="描述你想要的画面，回车即刻印刷…" maxlength="200" spellcheck="false">
+                <button class="btn btn-p hm-go" id="homeGo"><svg class="ic"><use href="#i-send"/></svg>开始生成</button>
+              </div>
+              <nav class="hm-nav">
+                <button class="hm-nav-i dash-act" data-go="1">图片生成</button><i>·</i>
+                <button class="hm-nav-i dash-act" data-go="3">案例灵感库</button><i>·</i>
+                <button class="hm-nav-i dash-act" data-go="2">生成历史</button><i>·</i>
+                <button class="hm-nav-i dash-act" data-go="4">元数据工坊</button><i>·</i>
+                <button class="hm-nav-i dash-act" data-go="5">实时监控</button>
+              </nav>
             </div>
 
-            <div class="metric-grid dash-metrics" id="balanceCard" style="display:none">
-              <div class="metric-card fluid" data-material="ocean">
-                <span class="metric-kicker">TOKEN</span>
-                <div class="metric-title"><svg class="ic"><use href="#i-key"/></svg>账户令牌</div>
-                <strong class="metric-num" id="balanceToken">-</strong>
+            <div class="hm-spec">
+              <div class="hm-spec-h">
+                <span>印刷样张 SPECIMENS</span>
+                <button class="hm-spec-more dash-act" data-go="3">灵感库 487 例 →</button>
               </div>
-              <div class="metric-card fluid" data-material="rain">
-                <span class="metric-kicker">USAGE · 本月</span>
-                <div class="metric-title"><svg class="ic"><use href="#i-pulse"/></svg>已用额度</div>
-                <strong class="metric-num" id="balanceUsage">-</strong>
-              </div>
-              <div class="metric-card fluid" data-material="chrome">
-                <span class="metric-kicker">REMAIN</span>
-                <div class="metric-title"><svg class="ic"><use href="#i-layers"/></svg>剩余额度</div>
-                <strong class="metric-num" id="balanceRemain">-</strong>
-              </div>
-              <div class="metric-card fluid" data-material="ocean">
-                <span class="metric-kicker">TODAY</span>
-                <div class="metric-title"><svg class="ic"><use href="#i-image"/></svg>今日生成</div>
-                <strong class="metric-num" id="dashToday">-</strong>
+              <div class="hm-strip" id="specStrip">
+                <div class="hm-sp-skel"></div><div class="hm-sp-skel"></div><div class="hm-sp-skel"></div><div class="hm-sp-skel"></div><div class="hm-sp-skel"></div><div class="hm-sp-skel"></div>
               </div>
             </div>
 
-            <div class="dash-grid">
-              <div class="dash-panel panel">
-                <div class="dash-panel-h">
-                  <span>最近生成</span>
-                  <span class="dash-status" id="balanceStatus">查询中...</span>
-                </div>
-                <div class="dash-recent" id="overviewRecent">
-                  <p class="dash-empty">暂无生成记录，去生成第一张图吧</p>
-                </div>
-              </div>
-              <div class="dash-panel panel">
-                <div class="dash-panel-h"><span>快捷入口</span></div>
-                <div class="dash-actions">
-                  <button class="btn btn-p dash-act" data-go="1"><svg class="ic"><use href="#i-spark"/></svg>立即生成</button>
-                  <button class="btn dash-act" data-go="3"><svg class="ic"><use href="#i-book"/></svg>案例灵感</button>
-                  <button class="btn dash-act" data-go="2"><svg class="ic"><use href="#i-clock"/></svg>生成历史</button>
-                  <button class="btn dash-act" data-go="5"><svg class="ic"><use href="#i-pulse"/></svg>实时监控</button>
-                </div>
-                <div class="dash-tip">
-                  <svg class="ic"><use href="#i-alert"/></svg>
-                  <span>计费 = 模型原价 × 分组倍率，顶栏齿轮可配置 API Key</span>
-                </div>
-              </div>
-            </div>
+            <footer class="hm-foot">
+              <span>今日 <b id="dashToday">-</b></span><i>·</i>
+              <span>余额 <b id="ftBal">-</b></span><i>·</i>
+              <span>本月已用 <b id="ftUsage">-</b></span><i>·</i>
+              <span>第 V3.2 期</span><i>·</i>
+              <span>OpenLux 出品</span>
+            </footer>
+
           </div>
         </section>
 
-        <!-- ═══ TAB 1: Image Generation ═══ -->
+<!-- ═══ TAB 1: Image Generation ═══ -->
         <section class="tab-pane" id="tab1">
           <div class="page page-gen">
-            <!-- 顶置控制条 -->
-            <div class="gen-top panel">
-              <div class="gen-mode">
+
+            <!-- 顶部参数带 -->
+            <section class="gz-params">
+              <div class="gz-mode">
                 <button class="gm-btn active" data-mode="txt2img" id="btnModeTxt2Img">
                   <svg class="ic"><use href="#i-image"/></svg>文生图
                 </button>
@@ -180,32 +173,34 @@
                   <svg class="ic"><use href="#i-layers"/></svg>图生图
                 </button>
               </div>
-              <div class="ctl-g">
-                <label class="ctl-lbl">比例</label>
+              <div class="gz-field">
+                <label class="ctl-lbl">模型 MODEL</label>
+                <select class="ctl-sel" id="modelSelect"><option>加载中...</option></select>
+              </div>
+              <div class="gz-field">
+                <label class="ctl-lbl">分组 GROUP <span class="ctl-rate" id="groupRate"></span></label>
+                <select class="ctl-sel" id="groupSelect"><option>加载中...</option></select>
+              </div>
+              <div class="gz-field gz-grow">
+                <label class="ctl-lbl">比例 RATIO</label>
                 <div class="ctl-pills" id="ratioGrid"></div>
               </div>
-              <div class="ctl-g" style="min-width:118px">
-                <label class="ctl-lbl">分辨率</label>
+              <div class="gz-field">
+                <label class="ctl-lbl">清晰度 QUALITY</label>
                 <select class="ctl-sel" id="resolutionSelect">
                   <option value="1">1MP · 标准</option>
                   <option value="2">2MP · 高清</option>
                   <option value="4">4MP · 超清</option>
                 </select>
               </div>
-              <div class="ctl-g" style="min-width:138px">
-                <label class="ctl-lbl">分组 <span class="ctl-rate" id="groupRate"></span></label>
-                <select class="ctl-sel" id="groupSelect"><option>加载中...</option></select>
+              <div class="gz-field">
+                <label class="ctl-lbl">画质 LEVEL</label>
+                <select class="ctl-sel" id="qualitySelect">
+                  <option value="auto">自动</option>
+                </select>
               </div>
-              <div class="ctl-g" style="min-width:140px">
-                <label class="ctl-lbl">模型</label>
-                <select class="ctl-sel" id="modelSelect"><option>加载中...</option></select>
-              </div>
-              <div class="ctl-g" style="min-width:120px">
-                <label class="ctl-lbl">风格模板</label>
-                <select class="ctl-sel" id="templateSelect"><option value="">无模板</option></select>
-              </div>
-              <div class="ctl-g">
-                <label class="ctl-lbl">数量</label>
+              <div class="gz-field">
+                <label class="ctl-lbl">数量 COUNT</label>
                 <div class="ctl-pills" id="countGroup">
                   <button class="p-btn active" data-count="1">1</button>
                   <button class="p-btn" data-count="2">2</button>
@@ -213,53 +208,24 @@
                   <button class="p-btn" data-count="4">4</button>
                 </div>
               </div>
-            </div>
-
-            <!-- 全宽画布 -->
-            <div class="gen-canvas panel">
-              <div class="canvas-center">
-                <div class="g-empty" id="emptyState">
-                  <div class="g-empty-icon"><svg class="ic"><use href="#i-image"/></svg></div>
-                  <p>输入提示词，点击生成</p>
-                  <div class="g-empty-hint">快捷键 <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> 快速生成 · <span class="kbd">Ctrl</span> + <span class="kbd">1~6</span> 切换页面</div>
-                </div>
-                <div class="g-prog" id="genBox" style="display:none">
-                  <div class="g-prog-h">
-                    <span><svg class="ic"><use href="#i-spark"/></svg>生成中</span>
-                    <span class="g-bdg" id="genBadge">处理中</span>
-                  </div>
-                  <div class="g-bar"><div class="g-fill" id="genBar"></div></div>
-                  <div class="g-log" id="genLog"></div>
-                </div>
-                <div class="g-res" id="resultsWrap">
-                  <div class="g-res-h">
-                    <span><svg class="ic"><use href="#i-image"/></svg>生成结果</span>
-                    <span class="g-res-c" id="resultsCount"></span>
-                    <div class="g-res-acts">
-                      <button class="btn btn-s btn-sm" id="btnRetry" style="display:none"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
-                      <button class="btn btn-s btn-sm" id="btnDownloadAll" style="display:none"><svg class="ic"><use href="#i-download"/></svg>全部下载</button>
-                    </div>
-                  </div>
-                  <div class="g-grid" id="imgGrid"></div>
-                </div>
+              <div class="gz-field gz-tpl">
+                <label class="ctl-lbl">模板 TEMPLATE</label>
+                <select class="ctl-sel" id="templateSelect"><option value="">无模板</option></select>
               </div>
+            </section>
 
-              <!-- 提示词浮层 -->
-              <div class="prompt-dock panel" id="promptDock">
-                <button class="dock-min" id="btnDockMin" title="收起 / 展开提示词"><svg class="ic"><use href="#i-chevR"/></svg></button>
-                <div class="dock-head">
-                  <div class="dh-l"><svg class="ic"><use href="#i-spark"/></svg>提示词 Prompt</div>
-                  <span class="dh-spark">CTRL + ENTER</span>
-                </div>
-                <div class="dock-body">
-                  <div class="img2img-area" id="img2imgArea" style="display:none">
-                    <div class="upload-zone" id="uploadZone">
-                      <div class="uz-icon"><svg class="ic"><use href="#i-camera"/></svg></div>
-                      <div class="uz-text">拖拽图片到这里，或<span class="uz-link" id="btnBrowse">点击选择</span></div>
-                      <div class="uz-hint">JPG / PNG / WebP · 最多 16 张 · 50MB</div>
-                      <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
-                    </div>
-                    <div class="upload-previews" id="uploadPreviews"></div>
+            <div class="gz-main">
+              <!-- 左：提示词列 -->
+              <section class="gz-left" id="promptDock">
+                <div class="img2img-area" id="img2imgArea" style="display:none">
+                  <div class="upload-zone" id="uploadZone">
+                    <div class="uz-icon"><svg class="ic"><use href="#i-camera"/></svg></div>
+                    <div class="uz-text">拖拽图片到这里，或<span class="uz-link" id="btnBrowse">点击选择</span></div>
+                    <div class="uz-hint">JPG / PNG / WebP · 最多 16 张 · 50MB</div>
+                    <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+                  </div>
+                  <div class="upload-previews" id="uploadPreviews"></div>
+                  <div class="gz-mask-row">
                     <div class="mask-toggle" id="maskToggle">
                       <label class="tog">
                         <input type="checkbox" id="maskMode"><span class="tog-track"></span>
@@ -272,29 +238,83 @@
                       <span class="mask-name" id="maskName">未选择</span>
                     </div>
                   </div>
-                  <div class="prompt-area">
-                    <textarea id="promptInput" placeholder="描述你想要生成的图片…" maxlength="4000"></textarea>
-                    <div class="prompt-foot">
-                      <span class="char-count" id="charCount">0 / 4000</span>
-                      <label class="tog">
-                        <input type="checkbox" id="multiMode"><span class="tog-track"></span>
-                        <span class="tog-lbl">独立模式 <span class="tog-ht" id="multiHint">每行各一张</span></span>
-                      </label>
-                    </div>
-                  </div>
-                  <div class="prompt-acts">
-                    <button class="btn gen-btn" id="btnGenerate" disabled>
-                      <svg class="ic"><use href="#i-send"/></svg><span id="btnGenLabel">生成</span>
-                    </button>
-                    <button class="btn btn-s" id="btnCancel" style="display:none">取消</button>
+                </div>
+
+                <div class="flabel-row">
+                  <span class="flabel">提示词 PROMPT</span>
+                  <span class="char-count" id="charCount">0 / 1000</span>
+                </div>
+                <textarea id="promptInput" placeholder="描述你想要生成的图片…" maxlength="1000"></textarea>
+                <div class="prompt-rule"><i></i></div>
+
+                <div class="gz-run-row">
+                  <button class="btn gen-btn" id="btnGenerate" disabled>
+                    <svg class="ic"><use href="#i-send"/></svg><span id="btnGenLabel">生成</span>
+                  </button>
+                  <button class="btn btn-s" id="btnCancel" style="display:none">取消</button>
+                  <label class="tog gz-tog">
+                    <input type="checkbox" id="multiMode"><span class="tog-track"></span>
+                    <span class="tog-lbl">独立模式 <span class="tog-ht" id="multiHint">每行各一张</span></span>
+                  </label>
+                </div>
+                <p class="gz-note">计费 = 模型原价 × 分组倍率 · 快捷键 <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> 快速生成</p>
+
+                <div class="block-h block-h2 gz-rp-h"><span>最近使用 RECENT</span><span class="block-hint">点击填入</span></div>
+                <div class="rp-list" id="recentPrompts">
+                  <p class="rp-empty">暂无记录，生成过的提示词会出现在这里</p>
+                </div>
+              </section>
+
+              <!-- 右：图像框列 -->
+              <section class="gz-right">
+                <div class="block-h out-block-h">
+                  <span>输出 OUTPUT</span>
+                  <span class="g-res-c" id="resultsCount">最新一批</span>
+                  <div class="g-res-acts">
+                    <button class="btn btn-s btn-sm" id="btnRetry" style="display:none"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
+                    <button class="btn btn-s btn-sm" id="btnDownloadAll" style="display:none"><svg class="ic"><use href="#i-download"/></svg>全部下载</button>
                   </div>
                 </div>
-              </div>
+
+                <div class="gz-canvas">
+                  <div class="g-empty" id="emptyState">
+                    <button class="g-empty-card" id="btnEmptyFocus" type="button">
+                      <div class="g-empty-icon"><svg class="ic"><use href="#i-image"/></svg></div>
+                      <p>输入提示词，点击生成</p>
+                      <div class="g-empty-hint">快捷键 <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> 快速生成 · <span class="kbd">Ctrl</span> + <span class="kbd">1~6</span> 切换页面</div>
+                    </button>
+                  </div>
+                  <div class="g-prog" id="genBox" style="display:none">
+                    <div class="g-prog-h">
+                      <span><svg class="ic"><use href="#i-spark"/></svg>生成中</span>
+                      <span class="g-bdg" id="genBadge">处理中</span>
+                    </div>
+                    <div class="g-bar"><div class="g-fill" id="genBar"></div></div>
+                    <div class="g-log" id="genLog"></div>
+                  </div>
+                  <div class="g-res" id="resultsWrap">
+                    <div class="g-grid" id="imgGrid"></div>
+                  </div>
+                </div>
+
+                <div class="block-h block-h2 gz-sub-h"><span>本次任务 TASK</span></div>
+                <div class="gz-task">
+                  <div class="gt-cell"><span class="gt-k">模型</span><span class="gt-v" id="genCurModel">-</span></div>
+                  <div class="gt-cell"><span class="gt-k">分组</span><span class="gt-v" id="genCurGroup">-</span></div>
+                  <div class="gt-cell"><span class="gt-k">尺寸</span><span class="gt-v" id="genCurRatio">-</span></div>
+                </div>
+
+                <div class="block-h block-h2"><span>最近生成 HISTORY</span></div>
+                <div class="side-recent gz-hist" id="sideRecent">
+                  <p class="dash-empty" style="padding:18px 0">暂无记录</p>
+                </div>
+              </section>
             </div>
+
           </div>
         </section>
 
-        <!-- ═══ TAB 2: History ═══ -->
+<!-- ═══ TAB 2: History ═══ -->
         <section class="tab-pane" id="tab2">
           <div class="page">
             <div class="page-h">
@@ -311,11 +331,13 @@
         <section class="tab-pane" id="tab3">
           <div class="page">
             <div class="page-h">
-              <h2 class="page-title">案例展示</h2>
+              <h2 class="page-title">案例灵感库</h2>
               <span class="case-count" id="caseCount">加载中...</span>
             </div>
-            <div class="case-filter" id="caseFilter">
-              <button class="cf-btn active" data-cat="">全部</button>
+            <div class="case-toolbar panel">
+              <div class="case-filter" id="caseFilter">
+                <button class="cf-btn active" data-cat="">全部</button>
+              </div>
             </div>
             <div class="case-grid" id="caseGrid"></div>
             <div class="hist-empty" id="caseEmpty" style="display:none">暂无案例</div>
@@ -328,7 +350,7 @@
           <div class="page">
             <div class="page-h" style="flex-direction:column;align-items:flex-start;gap:2px">
               <h2 class="page-title">元数据</h2>
-              <p class="page-desc" style="margin-bottom:0">批量修改图片元数据，减少平台对 AI 识别</p>
+              <p class="page-desc" style="margin-bottom:0">批量修改图片元数据，降低平台对 AI 图片的识别率</p>
             </div>
             <div class="meta-body">
               <div class="meta-upload panel" id="metaDrop">
@@ -493,6 +515,7 @@
       <div class="s-row">
         <label for="pageApiKey">API Key</label>
         <input type="password" id="pageApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
+        <p class="s-hint">令牌名称：<span id="keyNameText">-</span></p>
         <p class="s-hint">余额查看见「概览」页</p>
       </div>
       <button class="btn btn-p" id="pageSaveBtn" style="width:100%">保存设置</button>
@@ -502,8 +525,8 @@
       <div class="ctl-lbl" style="margin-bottom:8px">帮助信息</div>
       <div class="info-list">
         <li>注册 <a href="https://doc.openlux.ai" target="_blank" class="info-link">OpenLux</a> 控制台创建 API Key</li>
-        <li>推荐 <strong>gpt-image-2</strong>，支持 2K/4K 生成</li>
-        <li>计费 = 模型原价 × 分组倍率（默认 ×0.07353）</li>
+        <li>推荐 <strong>gpt-image-2.5-flare-c</strong>，支持 2K/4K 生成</li>
+        <li>计费 = 按次单价 × 分组倍率（模型与费率自动同步线上数据）</li>
         <li>429 繁忙会自动退避重试（5s/10s/20s）</li>
       </div>
     </div>
@@ -588,6 +611,93 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=18"></script>
+  <script src="/js/app.js?v=45"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+  /* Swiss 入场动效：GSAP 可用且未开启“减少动态效果”时启用；否则 CSS 兜底直接显示 */
+  (function(){
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof gsap === 'undefined' || reduce) {
+      document.documentElement.classList.remove('gsap-anim');
+      return;
+    }
+    document.documentElement.classList.add('gsap-anim');
+    gsap.defaults({ease:'power3.out'});
+    function intro(){
+      var tl = gsap.timeline({defaults:{ease:'power3.out'}});
+      tl.fromTo('.hdr', {y:-12, opacity:0}, {y:0, opacity:1, duration:.55}, 0)
+        .fromTo('.nav', {opacity:0}, {opacity:1, duration:.5}, .12)
+        .fromTo('.tab-pane.active .page > *',
+          {opacity:0, y:18},
+          {opacity:1, y:0, stagger:.07, duration:.55, clearProps:'transform'}, .18);
+    }
+    intro();
+    /* 切页时子元素级联入场 */
+    document.addEventListener('click', function(e){
+      if (!e.target.closest || !e.target.closest('.nav-item')) return;
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        var pane = document.querySelector('.tab-pane.active');
+        if (!pane) return;
+        gsap.fromTo(pane.querySelectorAll('.page > *'),
+          {opacity:0, y:16},
+          {opacity:1, y:0, stagger:.06, duration:.5, clearProps:'transform'});
+      });});
+    });
+    /* 首页：印刷样张（案例库精选，非用户生成内容） */
+    (function(){
+      var box = document.getElementById('specStrip');
+      if (!box) return;
+      var W = [1.7,1,1.35,1,1.6,1,1.25,1.5,1.1,1.4];
+      fetch('/api/cases?page=1&limit=10').then(function(r){ return r.json(); }).then(function(d){
+        var list = (d && d.cases) || [];
+        if (!list.length) return;
+        box.innerHTML = '';
+        list.forEach(function(c, i){
+          if (!c.image_url) return;
+          var it = document.createElement('div');
+          it.className = 'hm-sp';
+          it.style.flexGrow = W[i % W.length];
+          it.innerHTML = '<img src="' + c.image_url + '" alt="" loading="lazy">' +
+            '<span class="hm-sp-cap">' + String(c.title || '').slice(0, 16) + '</span>';
+          it.addEventListener('click', function(){
+            var nv = document.querySelector('.nav-item[data-tab="3"]');
+            if (nv) nv.click();
+          });
+          box.appendChild(it);
+        });
+      }).catch(function(){});
+    })();
+    /* 首页：页脚余额 */
+    (function(){
+      fetch('/api/config/balance').then(function(r){ return r.json(); }).then(function(d){
+        if (!d || (!d.configured)) return;
+        var b = document.getElementById('ftBal'), u = document.getElementById('ftUsage');
+        if (b) b.textContent = String(d.remaining != null ? d.remaining : '-');
+        if (u) u.textContent = '$' + (d.total_usage || 0);
+      }).catch(function(){});
+    })();
+    /* 首页：日期线 + 快速创作跳转 + 设置入口 */
+    (function(){
+      var d = new Date();
+      var hd = document.getElementById('homeDate');
+      if (hd) hd.textContent = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 · 星期' + '日一二三四五六'.charAt(d.getDay());
+      var hg = document.getElementById('homeGreet');
+      if (hg) { var h = d.getHours(); hg.textContent = h<6 ? '夜深了' : h<12 ? '早上好' : h<18 ? '下午好' : '晚上好'; }
+      var go = document.getElementById('homeGo');
+      if (go) go.addEventListener('click', function(){
+        var ip = document.getElementById('homePrompt');
+        var ta = document.getElementById('promptInput');
+        if (ta && ip && ip.value.trim()) { ta.value = ip.value.trim(); ta.dispatchEvent(new Event('input', {bubbles:true})); }
+        var nv = document.querySelector('.nav-item[data-tab="1"]');
+        if (nv) nv.click();
+        if (ta) ta.focus();
+      });
+      var hp = document.getElementById('homePrompt');
+      if (hp) hp.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); go && go.click(); } });
+      var is = document.getElementById('idxSettings');
+      if (is) is.addEventListener('click', function(){ var b = document.getElementById('btnSettings'); if (b) b.click(); });
+    })();
+  })();
+  </script>
 </body>
 </html>

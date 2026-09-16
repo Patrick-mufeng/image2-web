@@ -1,6 +1,7 @@
 """FastAPI 应用入口"""
 
 import os
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,14 +10,17 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.routers import generation, history, config_routes, templates, cases, metadata, edits
+from backend.services.model_catalog import get_catalog
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：确保数据目录存在"""
+    """应用生命周期：确保数据目录存在 + 预热模型目录"""
     os.makedirs(settings.data_dir, exist_ok=True)
     os.makedirs(settings.image_save_dir, exist_ok=True)
     os.makedirs("data", exist_ok=True)
+    # 后台预热模型/分组目录（/v1/models + /api/pricing），避免首屏下拉框停在「加载中...」
+    asyncio.create_task(get_catalog())
     yield
 
 

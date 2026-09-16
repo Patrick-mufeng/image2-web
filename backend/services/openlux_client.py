@@ -68,17 +68,27 @@ class OpenLuxClient:
     # ── OpenAI 格式：即时返回 ──────────────────────────────────────
 
     async def openai_generate(self, prompt: str, model: str = "gpt-image-2",
-                               size: str = "1024x1024", n: int = 1) -> dict:
+                               size: str = "1024x1024", n: int = 1,
+                               quality: str | None = None,
+                               output_format: str | None = None) -> dict:
         """调用 OpenAI 兼容的 /v1/images/generations 接口（即时返回）
-        上游可能返回 429「系统繁忙」，自动退避重试（5s / 10s / 20s）"""
+        上游可能返回 429「系统繁忙」，自动退避重试（5s / 10s / 20s）；
+        遇 400/422 参数错误时自动回退最小参数集（model/prompt/size）重试一次。
+        n 仅在 >1 时发送（部分 -c 渠道不支持 n 参数）；quality/format 由调用方按模型能力过滤后传入。"""
         base_url = self._normalize_base()
 
         payload = {
             "model": model,
             "prompt": prompt,
-            "n": n,
             "size": size,
         }
+        if n and n > 1:
+            payload["n"] = n
+        if quality:
+            payload["quality"] = quality
+        if output_format:
+            payload["format"] = output_format
+        minimal_payload = {"model": model, "prompt": prompt, "size": size}
 
         url = f"{base_url}/v1/images/generations"
         req_info = {
@@ -90,6 +100,7 @@ class OpenLuxClient:
 
         max_retries = 3  # 429 上游繁忙时的自动重试次数
         retried = 0
+        used_fallback = False
 
         for attempt in range(max_retries + 1):
             try:
@@ -108,6 +119,13 @@ class OpenLuxClient:
                 "body": resp.text[:2000],
             }
 
+            # 参数被上游拒绝 → 回退最小参数集重试一次
+            if resp.status_code in (400, 422) and not used_fallback and payload != minimal_payload:
+                used_fallback = True
+                payload = dict(minimal_payload)
+                req_info["body"] = payload
+                continue
+
             if resp.status_code == 429 and attempt < max_retries:
                 retried += 1
                 await asyncio.sleep(5 * (2 ** attempt))  # 5s / 10s / 20s
@@ -121,7 +139,10 @@ class OpenLuxClient:
                     response_info=resp_info,
                 )
 
-            return self._safe_json(resp, req_info)
+            result = self._safe_json(resp, req_info)
+            if used_fallback:
+                result["_fallback_minimal"] = True
+            return result
 
     # ── Replicate 格式：异步任务 + 轮询（预留，当前无模型走此通道） ──
 
@@ -248,9 +269,12 @@ class OpenLuxClient:
             "model": (None, model),
             "n": (None, str(n)),
             "size": (None, size),
-            "quality": (None, quality),
-            "background": (None, background),
         }
+        # auto 是上游默认值，省略以兼容不支持该字段的 -c 渠道
+        if quality and quality != "auto":
+            files["quality"] = (None, quality)
+        if background and background != "auto":
+            files["background"] = (None, background)
 
         if mask_data:
             files["mask"] = (mask_filename, mask_data, "image/png")
@@ -292,43 +316,8 @@ class OpenLuxClient:
             return self._safe_json(resp, req_info)
 
     # ── OpenAI 格式：多图参考生成 (gpt-image-2-all) ──────────────
-
-    async def reference_generate(self, prompt: str, image_urls: list[str],
-                                  model: str = "gpt-image-2-all",
-                                  size: str = "1024x1024", n: int = 1) -> dict:
-        """调用 gpt-image-2-all 多图参考生成接口"""
-        base_url = self._normalize_base()
-
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "n": n,
-            "size": size,
-            "image": image_urls,
-        }
-
-        url = f"{base_url}/v1/images/generations"
-        req_info = {"method": "POST", "url": url, "headers": {k: v[:50] for k, v in self._headers().items()}, "body": payload}
-
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.post(url, headers=self._headers(), json=payload)
-        except httpx.TimeoutException as e:
-            raise OpenLuxAPIError(f"多图参考生成超时，请重试", request_info=req_info) from e
-        except httpx.ConnectError as e:
-            raise OpenLuxAPIError(f"无法连接 API 服务器", request_info=req_info) from e
-        except httpx.HTTPError as e:
-            raise OpenLuxAPIError(f"网络请求异常: {e}", request_info=req_info) from e
-
-        resp_info = {"status": resp.status_code, "headers": dict(resp.headers), "body": resp.text[:2000]}
-
-        if resp.status_code != 200:
-            raise OpenLuxAPIError(
-                f"多图参考生成失败 ({resp.status_code}): {resp.text[:500]}",
-                request_info=req_info, response_info=resp_info,
-            )
-
-        return self._safe_json(resp, req_info)
+    # （已移除：gpt-image-2-all 模型已下线；gpt-image-2-c 直接在
+    #   /v1/images/generations 传 image 数组即可实现多图参考）
 
 
 # 全局单例

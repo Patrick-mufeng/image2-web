@@ -17,6 +17,7 @@
     pageStatus: $('pageStatus'), pageSaveBtn: $('pageSaveBtn'),
     ratioGrid: $('ratioGrid'), resolutionSelect: $('resolutionSelect'),
     modelSelect: $('modelSelect'), groupSelect: $('groupSelect'), groupRate: $('groupRate'), countGroup: $('countGroup'),
+    qualitySelect: $('qualitySelect'),
     promptInput: $('promptInput'), charCount: $('charCount'),
     multiMode: $('multiMode'), multiHint: $('multiHint'),
     btnGenerate: $('btnGenerate'), btnCancel: $('btnCancel'),
@@ -26,6 +27,7 @@
     historyGrid: $('historyGrid'), historyEmpty: $('historyEmpty'),
     historyPages: $('historyPages'), btnClearHistory: $('btnClearHistory'),
     monLive: $('monLive'), monEmpty: $('monEmpty'), monBody: $('monBody'),
+    monHistoryList: $('monHistoryList'), monHistoryCount: $('monHistoryCount'),
     monTaskId: $('monTaskId'),
     monSbStatus: $('monSbStatus'), monSbElapsed: $('monSbElapsed'),
     monSbModel: $('monSbModel'), monSbSize: $('monSbSize'), monSbTag: $('monSbTag'),
@@ -48,8 +50,8 @@
 
   const S = {
     tab: 0,
-    aspectRatio: '1:1', megapixels: '1', model: 'gpt-image-2',
-    numOutputs: 1, prompt: '', models: [], groups: [], selectedGroup: 'default',
+    aspectRatio: '1:1', megapixels: '1', model: '',
+    numOutputs: 1, quality: 'auto', prompt: '', models: [], groups: [], selectedGroup: '',
     apiConfigured: false, userApiKey: '', userBaseUrl: '',
     isGenerating: false, multiMode: false,
     mode: 'txt2img',  // 'txt2img' | 'img2img'
@@ -62,6 +64,23 @@
   let _pollTimer = null, _currentTaskId = null, _knownLogLen = 0, _cancelled = false;
 
   const esc = s => { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; };
+  function animateNum(el, val, opt) {
+    if (!el) return;
+    opt = opt || {};
+    const str = String(val);
+    if (!/^-?\d+(\.\d+)?$/.test(str)) { el.textContent = str; return; }
+    const target = parseFloat(str);
+    const dec = (str.split('.')[1] || '').length;
+    const t0 = performance.now(), dur = 720;
+    const pre = opt.pre || '', suf = opt.suf || '';
+    function tick(t) {
+      const p = Math.min(1, (t - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = pre + (target * eased).toFixed(dec) + suf;
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
   const fmtTime = iso => { if (!iso) return ''; try { return new Date(iso).toLocaleString('zh-CN'); } catch(e) { return iso; } };
 
   function toast(msg, type) {
@@ -111,6 +130,19 @@
   }
 
   // ── Tab 0: Settings ──
+  // 换 Key/地址后重拉模型与分组目录（后端保存设置时已清缓存，按新令牌重建）
+  async function refreshCatalog() {
+    try {
+      const [m, g] = await Promise.all([api('GET', '/api/config/models'), api('GET', '/api/config/groups')]);
+      if (m && m.models) S.models = m.models;
+      if (g && g.groups) S.groups = g.groups;
+      if (!S.groups.some(x => x.value === S.selectedGroup)) {
+        S.selectedGroup = S.groups.some(x => x.value === 'default') ? 'default' : (S.groups[0] ? S.groups[0].value : '');
+      }
+      renderGroups(); renderModels();
+      toast('模型目录已按当前 Key 刷新', 'info');
+    } catch(e) { /* 拉取失败不打断保存流程，下次刷新页面会重建 */ }
+  }
   function renderSettings() {
     DOM.pageStatus.innerHTML = S.apiConfigured
       ? '<span class="bdg ok">✅ 已连接</span>'
@@ -129,37 +161,48 @@
       toast('设置已保存', 'success');
       // 保存后自动查询余额
       if (k) queryBalance();
+      // 换 Key 后模型/分组可能不同，立即按新令牌重拉目录
+      refreshCatalog();
     } else { toast('保存失败: ' + (r.error || '未知'), 'error'); }
   });
 
   // ── Balance Query ──
   async function queryBalance() {
-    DOM.balanceCard.style.display = '';
-    DOM.balanceStatus.textContent = '查询中...';
-    DOM.balanceStatus.className = 'balance-status';
+    // 概览余额卡在上次重构中移除，balanceStatus/balanceToken 等可能不存在，全部判空
+    const setTxt = (el, t) => { if (el) el.textContent = t; };
+    if (DOM.balanceCard) DOM.balanceCard.style.display = '';
+    setTxt(DOM.balanceStatus, '查询中...');
+    if (DOM.balanceStatus) DOM.balanceStatus.className = 'balance-status';
     try {
       const data = await api('GET', '/api/config/balance');
+      // Key（令牌）名称：头部 + 设置抽屉同步显示
+      const keyName = data.token_name || '-';
+      setTxt(DOM.balanceToken, keyName);
+      setTxt(document.getElementById('hdrKeyName'), keyName);
+      setTxt(document.getElementById('keyNameText'), keyName);
       if (!data.configured) {
-        DOM.balanceStatus.textContent = '⏸ 未配置';
-        DOM.balanceStatus.className = 'balance-status';
-        DOM.balanceToken.textContent = '-';
-        DOM.balanceUsage.textContent = '-';
-        DOM.balanceRemain.textContent = '-';
+        setTxt(DOM.balanceStatus, '⏸ 未配置');
+        if (DOM.balanceStatus) DOM.balanceStatus.className = 'balance-status';
+        setTxt(DOM.balanceUsage, '-');
+        setTxt(DOM.balanceRemain, '-');
+        setTxt(document.getElementById('hdrBalance'), '-');
+        setTxt(document.getElementById('hdrUsage'), '-');
         return;
       }
       if (data.error) {
-        DOM.balanceStatus.textContent = '❌ ' + data.error;
-        DOM.balanceStatus.className = 'balance-status err';
+        setTxt(DOM.balanceStatus, '❌ ' + data.error);
+        if (DOM.balanceStatus) DOM.balanceStatus.className = 'balance-status err';
         return;
       }
-      DOM.balanceStatus.textContent = '✅ 已更新';
-      DOM.balanceStatus.className = 'balance-status ok';
-      DOM.balanceToken.textContent = data.token_name || '-';
-      DOM.balanceUsage.textContent = '$' + (data.total_usage || 0);
-      DOM.balanceRemain.textContent = data.remaining || '-';
+      setTxt(DOM.balanceStatus, '✅ 已更新');
+      if (DOM.balanceStatus) DOM.balanceStatus.className = 'balance-status ok';
+      if (DOM.balanceUsage) animateNum(DOM.balanceUsage, (data.total_usage || 0), { pre: '$', dec: 4 });
+      if (DOM.balanceRemain) animateNum(DOM.balanceRemain, data.remaining || '-');
+      setTxt(document.getElementById('hdrBalance'), String(data.remaining || '不限量'));
+      setTxt(document.getElementById('hdrUsage'), '$' + (data.total_usage || 0));
     } catch(e) {
-      DOM.balanceStatus.textContent = '❌ 查询失败';
-      DOM.balanceStatus.className = 'balance-status err';
+      setTxt(DOM.balanceStatus, '❌ 查询失败');
+      if (DOM.balanceStatus) DOM.balanceStatus.className = 'balance-status err';
     }
   }
 
@@ -203,6 +246,7 @@
       if (g.value === S.selectedGroup) o.selected = true;
       DOM.groupSelect.appendChild(o);
     });
+    DOM.groupSelect.title = '分组由 API 令牌决定（网关按令牌分组路由），此处仅用于筛选模型与费率预估';
     updGroupRate();
   }
 
@@ -221,7 +265,7 @@
   function renderModels() {
     DOM.modelSelect.innerHTML = '';
     if (!S.models.length) {
-      const o = document.createElement('option'); o.value = 'gpt-image-2'; o.textContent = 'GPT Image 2';
+      const o = document.createElement('option'); o.value = 'gpt-image-2.5-flare-c'; o.textContent = 'GPT Image 2.5 Flare';
       DOM.modelSelect.appendChild(o); return;
     }
     // Filter models by selected group using supported_groups
@@ -243,11 +287,72 @@
       });
       DOM.modelSelect.appendChild(grp);
     });
-    // If current model not in filtered list, switch to first available
-    if (S.model && !filtered.find(m => m.value === S.model)) {
+    // 当前模型不在过滤结果里（含初始为空）→ 取第一个可用模型
+    if (!filtered.find(m => m.value === S.model)) {
       S.model = filtered[0].value;
       DOM.modelSelect.value = S.model;
     }
+    applyModelCaps();
+  }
+
+  // 按当前模型能力适配画质选项与数量按钮（能力来自动态目录）
+  function applyModelCaps() {
+    const m = S.models.find(x => x.value === S.model);
+    const caps = (m && m.capabilities) || { n: true, quality: ['auto'], format: false };
+
+    // 画质选项
+    if (DOM.qualitySelect) {
+      const qs = caps.quality || ['auto'];
+      DOM.qualitySelect.innerHTML = '';
+      qs.forEach(q => {
+        const o = document.createElement('option');
+        o.value = q;
+        o.textContent = { auto: '自动', low: '低（草稿）', medium: '中', high: '高', xhigh: '超高', max: '极限' }[q] || q;
+        DOM.qualitySelect.appendChild(o);
+      });
+      DOM.qualitySelect.disabled = qs.length <= 1;
+      if (!qs.includes(S.quality)) S.quality = 'auto';
+      DOM.qualitySelect.value = S.quality;
+    }
+
+    // 数量：不支持 n 的模型锁定为 1
+    if (DOM.countGroup) {
+      DOM.countGroup.querySelectorAll('.p-btn').forEach(b => {
+        const c = +b.dataset.count;
+        b.disabled = caps.n === false && c > 1;
+        if (b.disabled) b.classList.remove('active');
+      });
+      if (caps.n === false && S.numOutputs > 1) {
+        S.numOutputs = 1;
+        const first = DOM.countGroup.querySelector('.p-btn[data-count="1"]');
+        if (first) first.classList.add('active');
+      }
+    }
+
+    // 分辨率：仅支持固定档位的模型（如 gpt-image-2-c 仅 1K 三档）禁用 2MP/4MP
+    if (DOM.resolutionSelect) {
+      const fixed = caps.fixed_sizes && caps.fixed_sizes.length;
+      DOM.resolutionSelect.querySelectorAll('option').forEach(o => {
+        o.disabled = !!fixed && o.value !== '1';
+      });
+      if (fixed && S.megapixels !== '1') {
+        S.megapixels = '1';
+        DOM.resolutionSelect.value = '1';
+      }
+    }
+    syncGenPanel();
+  }
+
+  function syncGenPanel() {
+    const gm = document.getElementById('genCurModel');
+    if (gm) gm.textContent = S.model || '-';
+    const gg = document.getElementById('genCurGroup');
+    if (gg) {
+      const g = S.groups.find(x => x.value === S.selectedGroup);
+      gg.textContent = g ? g.label : (S.selectedGroup || '-');
+    }
+    const gr = document.getElementById('genCurRatio');
+    if (gr) gr.textContent = (S.aspectRatio || '1:1') + ' · ' + (S.megapixels || '1') + 'MP';
   }
 
   // ── Tab 1: Helpers ──
@@ -437,6 +542,8 @@
       const c = DOM.imgGrid.firstElementChild;
       if (c) { c.classList.add('solo'); }
     }
+    loadSideRecent();
+    loadRecentPrompts();
     DOM.resultsWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function closeLb() { DOM.lightbox.style.display='none'; DOM.lightbox.classList.remove('show'); }
@@ -658,6 +765,18 @@
       var data = await api('GET', '/api/logs?limit=50&page=1');
       _monHistory.entries = data.logs || [];
       renderMonitorHistory();
+      // 面板尚未展示时（初次进入/清空后）：有记录则显示面板并自动展示最近一条
+      if (_monHistory.entries.length) {
+        if (DOM.monBody.style.display !== 'flex') {
+          var latest = _monHistory.entries[0];
+          _monHistory.selectedId = latest.id;
+          renderMonitorHistory();
+          showHistoryDetail(latest);
+        }
+      } else if (DOM.monBody.style.display !== 'flex') {
+        DOM.monEmpty.style.display = '';
+        DOM.monBody.style.display = 'none';
+      }
     } catch(e) {
       DOM.monHistoryList.innerHTML = '<p class="mh-empty">加载失败</p>';
     }
@@ -776,6 +895,7 @@
       num_outputs: 1, output_format: S.outputFormat || 'jpg',
       output_quality: S.outputQuality || 80,
       num_inference_steps: S.numInferenceSteps || 4,
+      quality: S.quality || 'auto',
       model: S.model
     });
     if (resp.success && resp.images && resp.images.length) { log('  ['+idx+'/'+total+'] ✅ 完成','ok'); return {images:resp.images,request:resp.request_data,response:resp.response_data}; }
@@ -818,7 +938,7 @@
     // 初始化监控面板
     var monReqData = {
       model: S.model, aspect_ratio: S.aspectRatio, megapixels: S.megapixels,
-      num_outputs: S.numOutputs, prompt: S.prompt.slice(0, 150),
+      num_outputs: S.numOutputs, prompt: S.prompt,
       prompt_full_length: S.prompt.length,
     };
     initMonitor(monReqData);
@@ -852,12 +972,12 @@
         var waited = ((Date.now() - t0) / 1000).toFixed(0);
         log('⏳ 等待 API 响应中... 已等待 ' + waited + 's', 'l');
       }, 30000);
-      const resp = await api('POST','/api/generate',{prompt:S.prompt,aspect_ratio:S.aspectRatio,megapixels:S.megapixels,num_outputs:S.numOutputs,model:S.model});
+      const resp = await api('POST','/api/generate',{prompt:S.prompt,aspect_ratio:S.aspectRatio,megapixels:S.megapixels,num_outputs:S.numOutputs,quality:S.quality||'auto',model:S.model});
       clearInterval(heartbeatTimer);
       if (_cancelled) { finishGen(); return; }  // 用户已取消，丢弃结果
 
       // 更新监控面板
-      var steps = (resp.response_data && resp.response_data.monitor_steps) || [];
+      var steps = resp.monitor_steps || (resp.response_data && resp.response_data.monitor_steps) || [];
       _monState.elapsed = resp.total_time || 0;
       updateMonitorSteps(steps);
       updateMonitorRes(resp.response_data || resp, resp.success);
@@ -888,13 +1008,22 @@
 
   // ── Image-to-Image ──
   function getEditSize() {
+    // 仅支持固定档位的模型（文档：gpt-image-2-c 限 1024x1024/1536x1024/1024x1536），按比例方向收敛
+    const m = S.models.find(x => x.value === S.model);
+    const fixed = m && m.capabilities && m.capabilities.fixed_sizes;
+    if (fixed && fixed.length) {
+      if (S.aspectRatio === '1:1') return fixed.includes('1024x1024') ? '1024x1024' : fixed[0];
+      const parts = S.aspectRatio.split(':').map(Number);
+      if (parts[0] >= parts[1]) return fixed.includes('1536x1024') ? '1536x1024' : fixed[0];
+      return fixed.includes('1024x1536') ? '1024x1536' : fixed[fixed.length - 1];
+    }
     // Map ratio+megapixels to size string (same as backend)
     const map = {
-      '1:1_1': '1024x1024', '1:1_2': '2048x2048', '1:1_4': '4096x4096',
+      '1:1_1': '1024x1024', '1:1_2': '2048x2048', '1:1_4': '2880x2880',
       '16:9_1': '1280x720', '16:9_2': '2560x1440', '16:9_4': '3840x2160',
       '9:16_1': '720x1280', '9:16_2': '1440x2560', '9:16_4': '2160x3840',
-      '4:3_1': '1152x864', '4:3_2': '2048x1536', '4:3_4': '4096x3072',
-      '3:4_1': '864x1152', '3:4_2': '1536x2048', '3:4_4': '3072x4096',
+      '4:3_1': '1152x864', '4:3_2': '2048x1536', '4:3_4': '3264x2448',
+      '3:4_1': '864x1152', '3:4_2': '1536x2048', '3:4_4': '2448x3264',
     };
     return map[S.aspectRatio + '_' + S.megapixels] || '1024x1024';
   }
@@ -1126,6 +1255,69 @@
   if (btnDockMin && promptDock) {
     btnDockMin.addEventListener('click', () => promptDock.classList.toggle('collapsed'));
   }
+  // 空状态取景框 → 聚焦提示词
+  const btnEmptyFocus = document.getElementById('btnEmptyFocus');
+  if (btnEmptyFocus) {
+    btnEmptyFocus.addEventListener('click', () => {
+      if (promptDock) promptDock.classList.remove('collapsed');
+      if (DOM.promptInput) { DOM.promptInput.focus(); DOM.promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    });
+  }
+
+  async function loadSideRecent() {
+    const box = document.getElementById('sideRecent');
+    if (!box) return;
+    try {
+      const d = await api('GET', '/api/history?page=1&limit=3');
+      const recs = (d && d.records) || [];
+      if (!recs.length) { box.innerHTML = '<p class="dash-empty" style="padding:18px 0">暂无记录</p>'; return; }
+      box.innerHTML = recs.map(r => {
+        const img = r.images && r.images[0];
+        const src = img ? (img.local_path || img.url || '') : '';
+        if (!src) return '';
+        return '<div class="sr-item" title="' + esc((r.prompt || '').slice(0, 46)) + '">' +
+          '<img src="' + esc(src) + '" alt="" loading="lazy">' +
+          '<div class="sr-info">' +
+          '<div class="sr-model">' + esc(r.model || '-') + '</div>' +
+          '<div class="sr-prompt">' + esc((r.prompt || '').slice(0, 22)) + '</div>' +
+          '<div class="sr-time">' + esc(fmtTime(r.created_at)) + '</div></div></div>';
+      }).join('');
+      box.querySelectorAll('.sr-item').forEach((it, i) => {
+        it.addEventListener('click', () => { S.historyPage = 1; loadHistory(); window._loadHist(i); });
+      });
+    } catch(e) {}
+  }
+
+  // 最近提示词（生成页左栏，点击填入）
+  async function loadRecentPrompts() {
+    const box = document.getElementById('recentPrompts');
+    if (!box) return;
+    try {
+      const d = await api('GET', '/api/history?page=1&limit=4');
+      const recs = ((d && d.records) || []).filter(r => r.prompt);
+      if (!recs.length) {
+        box.innerHTML = '<p class="rp-empty">暂无记录，生成过的提示词会出现在这里</p>';
+        return;
+      }
+      box.innerHTML = recs.map(r => {
+        const p = String(r.prompt || '');
+        return '<div class="rp-row" data-p="' + esc(p).replace(/"/g, '&quot;') + '">' +
+          '<span class="rp-t">' + esc(p.slice(0, 56)) + (p.length > 56 ? '…' : '') + '</span>' +
+          '<span class="rp-m">' + esc(r.model || '-') + ' · ' + esc(fmtTime(r.created_at)) + '</span></div>';
+      }).join('');
+      box.querySelectorAll('.rp-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const p = (row.dataset.p || '').slice(0, 1000);
+          DOM.promptInput.value = p;
+          S.prompt = p;
+          DOM.charCount.textContent = p.length + ' / 1000';
+          updBtn();
+          DOM.promptInput.focus();
+          toast('提示词已填入', 'success');
+        });
+      });
+    } catch (e) {}
+  }
 
   // ── Tab 0: 概览 Dashboard ──
   let _ovRecs = [];
@@ -1133,7 +1325,12 @@
     const recentEl = document.getElementById('overviewRecent');
     const todayEl = document.getElementById('dashToday');
     try {
-      const d = await api('GET', '/api/history?page=1&limit=8');
+      const hh = new Date().getHours();
+      const greetEl = document.getElementById('dashGreeting');
+      if (greetEl) {
+        greetEl.textContent = hh < 6 ? '夜深了，还在创作？' : hh < 12 ? '早上好，今天想生成点什么？' : hh < 18 ? '下午好，今天想生成点什么？' : '晚上好，今天想生成点什么？';
+      }
+      const d = await api('GET', '/api/history?page=1&limit=6');
       const recs = (d && d.records) || [];
       const today = new Date();
       const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
@@ -1144,9 +1341,20 @@
       });
       if (todayEl) {
         const total = d && d.total ? '累计 ' + d.total : '';
-        todayEl.textContent = todayCount > 0 ? todayCount + ' 张' : '0 张';
         todayEl.title = total || '';
+        animateNum(todayEl, todayCount, { suf: ' 张' });
+        const ht = document.getElementById('hdrToday');
+        if (ht) ht.textContent = todayCount + ' 张';
       }
+      const cm = document.getElementById('dashCurModel');
+      const cg = document.getElementById('dashCurGroup');
+      const cr = document.getElementById('dashCurRatio');
+      if (cm) cm.textContent = S.model || '-';
+      if (cg) {
+        const g = S.groups.find(x => x.value === S.selectedGroup);
+        cg.textContent = g ? g.label : (S.selectedGroup || '-');
+      }
+      if (cr) cr.textContent = (S.aspectRatio || '-') + ' · ' + (S.megapixels || '1') + 'MP';
       if (recentEl) {
         if (!recs.length) {
           recentEl.innerHTML = '<p class="dash-empty">暂无生成记录，去生成第一张图吧</p>';
@@ -1155,9 +1363,11 @@
             const img = r.images && r.images[0];
             const src = img ? (img.local_path || img.url || '') : '';
             if (!src) return '';
+            var RATIOS = ['1:1','16:9','9:16','4:3','3:4'];
+            var cap0 = RATIOS.indexOf(r.aspect_ratio) > -1 ? r.aspect_ratio : (r.model || '');
             return '<div class="recent-card" data-idx="' + i + '" title="' + esc((r.prompt || '').slice(0, 40)) + '">' +
               '<img src="' + esc(src) + '" alt="" loading="lazy">' +
-              '<span class="recent-meta">' + esc(r.aspect_ratio || r.model || '') + ' · ' + esc(fmtTime(r.created_at)) + '</span></div>';
+              '<span class="recent-meta">' + esc(cap0) + ' · ' + esc(fmtTime(r.created_at)) + '</span></div>';
           }).join('');
           _ovRecs = recs;
           recentEl.querySelectorAll('.recent-card').forEach(card => {
@@ -1185,7 +1395,7 @@
   DOM.themeIcon = document.getElementById('themeIcon');
   if (DOM.btnTheme) {
     const saved = localStorage.getItem('img2-theme');
-    if (saved === 'light') setTheme(false); else setTheme(true);  // 默认暗色
+    if (saved === 'dark') setTheme(true); else setTheme(false);  // 默认纸面亮色
     DOM.btnTheme.addEventListener('click', () => {
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       setTheme(!isDark);
@@ -1271,17 +1481,37 @@
   }
 
   // ── Events ──
-  DOM.resolutionSelect.addEventListener('change',()=>{S.megapixels=DOM.resolutionSelect.value;});
+  DOM.resolutionSelect.addEventListener('change',()=>{
+    S.megapixels=DOM.resolutionSelect.value;
+    const cr = document.getElementById('dashCurRatio');
+    if (cr) cr.textContent = S.aspectRatio + ' · ' + S.megapixels + 'MP';
+    const gr = document.getElementById('genCurRatio');
+    if (gr) gr.textContent = S.aspectRatio + ' · ' + S.megapixels + 'MP';
+  });
   DOM.groupSelect.addEventListener('change',()=>{
     S.selectedGroup = DOM.groupSelect.value;
     updGroupRate();
     renderModels();
     localStorage.setItem('mitu_selected_group', S.selectedGroup);
+    const cg = document.getElementById('dashCurGroup');
+    if (cg) cg.textContent = DOM.groupSelect.selectedOptions[0] ? DOM.groupSelect.selectedOptions[0].textContent : S.selectedGroup;
+    const gg = document.getElementById('genCurGroup');
+    if (gg) gg.textContent = cg ? cg.textContent : S.selectedGroup;
   });
-  DOM.modelSelect.addEventListener('change',()=>{S.model=DOM.modelSelect.value;});
+  DOM.modelSelect.addEventListener('change',()=>{
+    S.model=DOM.modelSelect.value;
+    const cm = document.getElementById('dashCurModel');
+    if (cm) cm.textContent = S.model;
+    const gm = document.getElementById('genCurModel');
+    if (gm) gm.textContent = S.model;
+    applyModelCaps();
+  });
+  if (DOM.qualitySelect) {
+    DOM.qualitySelect.addEventListener('change',()=>{ S.quality = DOM.qualitySelect.value; });
+  }
   DOM.countGroup.addEventListener('click',e=>{const b=e.target.closest('.p-btn');if(!b)return;S.numOutputs=+b.dataset.count;DOM.countGroup.querySelectorAll('.p-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');});
   if(DOM.multiMode){DOM.multiMode.addEventListener('change',()=>{S.multiMode=DOM.multiMode.checked;updMultiHint();});}
-  DOM.promptInput.addEventListener('input',()=>{S.prompt=DOM.promptInput.value;DOM.charCount.textContent=S.prompt.length+' / 4000';updMultiHint();updBtn();try{localStorage.setItem('mitu_prompt_draft', S.prompt);}catch(e){}});
+  DOM.promptInput.addEventListener('input',()=>{S.prompt=DOM.promptInput.value;DOM.charCount.textContent=S.prompt.length+' / 1000';updMultiHint();updBtn();try{localStorage.setItem('mitu_prompt_draft', S.prompt);}catch(e){}});
   DOM.promptInput.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();generateImage();}});
   DOM.btnGenerate.addEventListener('click',generateImage);
   DOM.btnCancel.addEventListener('click',cancelGen);
@@ -1304,15 +1534,16 @@
       if(!rec)return;
       closeHistModal();
       // Load params into generation tab
-      S.prompt=rec.prompt||'';
-      S.model=rec.model||'gpt-image-2';
+      S.prompt=(rec.prompt||'').slice(0,1000);
+      // 历史记录里的模型可能已下线（如 gpt-image-2），不在可用列表时回退第一个可用模型
+      S.model=(rec.model && S.models.some(m=>m.value===rec.model)) ? rec.model : '';
       S.aspectRatio=rec.aspect_ratio||'1:1';
       S.megapixels=rec.megapixels||'1';
       S.numOutputs=rec.num_outputs||1;
       // Update UI
       DOM.promptInput.value=S.prompt;
-      DOM.charCount.textContent=S.prompt.length+' / 4000';
-      DOM.modelSelect.value=S.model;
+      DOM.charCount.textContent=S.prompt.length+' / 1000';
+      if (!S.model) { renderModels(); } else { DOM.modelSelect.value=S.model; }
       DOM.resolutionSelect.value=S.megapixels;
       // Update ratio buttons
       DOM.ratioGrid.querySelectorAll('.r-btn, .p-btn').forEach(b=>{
@@ -1322,6 +1553,7 @@
       DOM.countGroup.querySelectorAll('.c-btn, .p-btn').forEach(b=>{
         b.classList.toggle('active',+b.dataset.count===S.numOutputs);
       });
+      applyModelCaps();
       updBtn();
       switchTab(1);
       toast('已加载，可修改后重新生成','info');
@@ -1378,9 +1610,10 @@
     if (tpl.pitfalls && tpl.pitfalls.zh) {
       prompt += '\n⚠️ 避免：' + tpl.pitfalls.zh.join('；');
     }
+    prompt = prompt.slice(0, 1000);
     DOM.promptInput.value = prompt;
     S.prompt = prompt;
-    DOM.charCount.textContent = prompt.length + ' / 4000';
+    DOM.charCount.textContent = prompt.length + ' / 1000';
     updBtn();
     toast('已应用模板：「' + ((tpl.title && tpl.title.zh) || tpl.id) + '」', 'info');
   });
@@ -1475,9 +1708,9 @@
 
   btnAiUse.addEventListener('click', () => {
     if (aiResult.value.trim()) {
-      DOM.promptInput.value = aiResult.value;
-      S.prompt = aiResult.value;
-      DOM.charCount.textContent = S.prompt.length + ' / 4000';
+      S.prompt = aiResult.value.slice(0, 1000);
+      DOM.promptInput.value = S.prompt;
+      DOM.charCount.textContent = S.prompt.length + ' / 1000';
       updBtn();
       aiModal.style.display = 'none';
       switchTab(1);
@@ -1568,10 +1801,15 @@
       const card = document.createElement('div');
       card.className = 'case-card';
       card.style.animationDelay = (i * 0.04) + 's';
+      const langBdg = c.language
+        ? '<span class="case-bdg lang' + (c.language === 'zh' ? ' zh' : ' en') + '">' + (c.language === 'zh' ? '中' : 'EN') + '</span>'
+        : '';
       card.innerHTML = (src ? '<img src="' + esc(src) + '" alt="" loading="lazy">' : '<div class="skel"></div>') +
+        '<span class="case-bdg cat">' + esc(c.category || '') + '</span>' + langBdg +
+        '<div class="case-overlay"><svg class="ic"><use href="#i-image"/></svg><span>查看灵感</span></div>' +
         '<div class="case-card-info">' +
-        '<div class="case-card-cat">' + esc(c.category || '') + '</div>' +
-        '<div class="case-card-title">' + esc(c.title || c.prompt_short || '') + '</div></div>';
+        '<div class="case-card-title">' + esc(c.title || c.prompt_short || '') + '</div>' +
+        '<div class="case-card-prompt">' + esc((c.prompt_short || c.prompt || '').slice(0, 90)) + '</div></div>';
       card.addEventListener('click', () => {
         openCaseDetail(c);
       });
@@ -1625,11 +1863,11 @@
   document.getElementById('btnCloseCase2').addEventListener('click', closeCaseModal);
   document.getElementById('btnCaseUse').addEventListener('click', () => {
     if (!_currentCase) return;
-    const prompt = _currentCase.prompt || _currentCase.title || '';
+    const prompt = (_currentCase.prompt || _currentCase.title || '').slice(0, 1000);
     if (prompt) {
       DOM.promptInput.value = prompt;
       S.prompt = prompt;
-      DOM.charCount.textContent = prompt.length + ' / 4000';
+      DOM.charCount.textContent = prompt.length + ' / 1000';
       updBtn();
       closeCaseModal();
       switchTab(1);
@@ -1884,19 +2122,21 @@
       S.models=(s3&&s3.models)?s3.models:[];
       S.groups=(s4&&s4.groups)?s4.groups:[];
     } catch(e){console.error('Init:',e);}
-    // Restore saved group preference
+    // Restore saved group preference; 动态目录下没有 default 时取第一个分组
     const savedGroup = localStorage.getItem('mitu_selected_group');
     if (savedGroup && S.groups.some(g => g.value === savedGroup)) {
       S.selectedGroup = savedGroup;
+    } else if (!S.groups.some(g => g.value === S.selectedGroup)) {
+      S.selectedGroup = S.groups.some(g => g.value === 'default') ? 'default' : (S.groups[0] ? S.groups[0].value : '');
     }
-    renderGroups(); renderModels(); updStatus(); renderSettings(); updBtn(); loadHistory();
+    renderGroups(); renderModels(); updStatus(); renderSettings(); updBtn(); loadHistory(); syncGenPanel();
 
     // 恢复提示词草稿
     const draft = localStorage.getItem('mitu_prompt_draft');
     if (draft) {
-      S.prompt = draft;
-      DOM.promptInput.value = draft;
-      DOM.charCount.textContent = draft.length + ' / 4000';
+      S.prompt = draft.slice(0, 1000);
+      DOM.promptInput.value = S.prompt;
+      DOM.charCount.textContent = draft.length + ' / 1000';
       updBtn();
     }
 
@@ -1917,6 +2157,8 @@
 
     // 概览页数据
     loadOverview();
+    loadSideRecent();
+    loadRecentPrompts();
 
     // Auto-query balance on load if configured
     if (S.apiConfigured) {

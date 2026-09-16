@@ -23,40 +23,10 @@ RESOLUTION_OPTIONS = [
     {"value": "4", "label": "4K (~4MP)", "desc": "超清画质"},
 ]
 
-# 模型列表 — group 用于前端 optgroup
-# supported_groups 标注该模型在哪些分组下可用
-# 来源：OpenLux GET /v1/models 实测（图片相关模型），2026-08
-AVAILABLE_MODELS = [
-    {"value": "gpt-image-2", "label": "GPT Image 2 (推荐)", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "Gpt-Image-2", "Gpt-Image-1"]},
-    {"value": "gpt-image-2-c", "label": "GPT Image 2-C", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "Gpt-Image-2"]},
-    {"value": "gpt-image-1", "label": "GPT Image 1", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "Gpt-Image-1"]},
-    {"value": "dall-e-3", "label": "DALL-E 3", "group": "✨ OpenAI 格式 · 即时返回",
-     "supported_groups": ["default", "Gpt-Image-1"]},
-]
-
-# ── 分组定义（16个分组，来源：OpenLux 官方分组参考）───────────────
-# 计费 = 模型原价 × 分组倍率（rate）；分组仅用于 UI 过滤与费率展示
-GROUP_DEFINITIONS = [
-    {"value": "default",     "label": "default 默认",       "rate": 0.07353, "desc": "OpenLux 默认分组，支持 GPT/Claude/图片等全模型", "types": ["openai","image"]},
-    {"value": "Gpt-Image-1", "label": "GPT Image 1",        "rate": 0.07353, "desc": "GPT-Image 官方网站资源",                  "types": ["image"]},
-    {"value": "Gpt-Image-2", "label": "GPT Image 2",        "rate": 0.09192, "desc": "GPT-Image-2（Adobe 资源）",                 "types": ["image"]},
-    {"value": "Doubao-1",    "label": "豆包 1",              "rate": 0.07353, "desc": "豆包/国产模型（自建资源）",               "types": ["image","openai"]},
-    {"value": "Doubao-2",    "label": "豆包 2",              "rate": 0.1103,  "desc": "豆包/国产模型",                            "types": ["image","openai"]},
-    {"value": "Doubao-3",    "label": "豆包 3",              "rate": 0.22059, "desc": "豆包/国产模型（高倍率）",                 "types": ["image","openai"]},
-    {"value": "Wenxin-1",    "label": "文心 1",              "rate": 0.07353, "desc": "文心一言（官方资源）",                    "types": ["image","openai"]},
-    {"value": "Wenxin-2",    "label": "文心 2",              "rate": 0.1103,  "desc": "文心一言",                               "types": ["image","openai"]},
-    {"value": "Wenxin-3",    "label": "文心 3",              "rate": 0.22059, "desc": "文心一言（高倍率）",                     "types": ["image","openai"]},
-    {"value": "Pix-1",       "label": "Pix 即梦",            "rate": 0.07353, "desc": "Pix 资源",                               "types": ["image","video"]},
-    {"value": "MJ-1",        "label": "Midjourney Slow",     "rate": 0.04412, "desc": "MJ Slow 慢速出图",                        "types": ["image"]},
-    {"value": "MJ-2",        "label": "Midjourney Fast",     "rate": 0.07353, "desc": "MJ Fast 快速出图",                        "types": ["image"]},
-    {"value": "Kling-1",     "label": "可灵 1",              "rate": 0.05147, "desc": "可灵 Kling（腾讯资源）",                    "types": ["image","video"]},
-    {"value": "Kling-2",     "label": "可灵 2",              "rate": 0.07353, "desc": "可灵 Kling（快手资源）",                    "types": ["image","video"]},
-    {"value": "Suno-1",      "label": "Suno 1",              "rate": 0.07353, "desc": "Suno 音乐生成",                            "types": ["music"]},
-    {"value": "Suno-2",      "label": "Suno 2",              "rate": 0.1103,  "desc": "Suno 音乐生成",                            "types": ["music"]},
-]
+# 模型与分组的权威数据来自 model_catalog（/v1/models + /api/pricing 动态拉取），
+# 这里的常量仅作拉取失败时的兜底。
+from backend.services.model_catalog import FALLBACK_GROUPS as GROUP_DEFINITIONS, FALLBACK_MODELS as AVAILABLE_MODELS
+from backend.services.model_catalog import get_catalog
 
 OUTPUT_FORMATS = [
     {"value": "jpg", "label": "JPEG"},
@@ -65,12 +35,14 @@ OUTPUT_FORMATS = [
 ]
 
 # 尺寸映射：aspect_ratio + megapixels → OpenAI size string
+# gpt-image-2 / 2.5 的硬限制：最大边 ≤3840、宽高均为 16px 倍数、长宽比 ≤3:1、
+# 总像素 655,360 ~ 8,294,400（= 3840×2160）。4MP 档据此取合规最大值。
 SIZE_MAP = {
-    ("1:1", "1"): "1024x1024", ("1:1", "2"): "2048x2048", ("1:1", "4"): "4096x4096",
+    ("1:1", "1"): "1024x1024", ("1:1", "2"): "2048x2048", ("1:1", "4"): "2880x2880",
     ("16:9", "1"): "1280x720", ("16:9", "2"): "2560x1440", ("16:9", "4"): "3840x2160",
     ("9:16", "1"): "720x1280", ("9:16", "2"): "1440x2560", ("9:16", "4"): "2160x3840",
-    ("4:3", "1"): "1152x864", ("4:3", "2"): "2048x1536", ("4:3", "4"): "4096x3072",
-    ("3:4", "1"): "864x1152", ("3:4", "2"): "1536x2048", ("3:4", "4"): "3072x4096",
+    ("4:3", "1"): "1152x864", ("4:3", "2"): "2048x1536", ("4:3", "4"): "3264x2448",
+    ("3:4", "1"): "864x1152", ("3:4", "2"): "1536x2048", ("3:4", "4"): "2448x3264",
 }
 
 
@@ -82,6 +54,23 @@ def is_replicate_model(model: str) -> bool:
 def resolve_size(ratio: str, megapixels: str) -> str:
     """根据比例和分辨率获取 OpenAI size 字符串"""
     return SIZE_MAP.get((ratio, megapixels), "1024x1024")
+
+
+def resolve_size_for_caps(ratio: str, megapixels: str, caps: dict | None) -> tuple[str, bool]:
+    """按模型能力解析尺寸。模型仅支持固定档位时（如 gpt-image-2-c 的 1K 三档），
+    按比例方向收敛到最接近的档位。返回 (size, 是否被收敛)。"""
+    fixed = (caps or {}).get("fixed_sizes") or []
+    if not fixed:
+        return resolve_size(ratio, megapixels), False
+    if ratio == "1:1" and "1024x1024" in fixed:
+        return "1024x1024", True
+    try:
+        w, h = (int(x) for x in ratio.split(":"))
+    except ValueError:
+        w, h = 1, 1
+    if w >= h:
+        return ("1536x1024" if "1536x1024" in fixed else fixed[0]), True
+    return ("1024x1536" if "1024x1536" in fixed else fixed[-1]), True
 
 
 class SettingsUpdateRequest(BaseModel):
@@ -170,14 +159,17 @@ async def get_resolutions():
 
 @router.get("/config/models")
 async def get_models():
-    """获取可用模型列表"""
-    return {"models": AVAILABLE_MODELS, "formats": OUTPUT_FORMATS}
+    """获取可用模型列表 — 优先线上动态目录（令牌实际可用 + 定价），失败回退内置表"""
+    catalog = await get_catalog()
+    return {"models": catalog["models"], "formats": OUTPUT_FORMATS, "source": catalog["source"]}
 
 
 @router.get("/config/groups")
 async def get_groups():
-    """获取可用分组列表"""
-    return {"groups": GROUP_DEFINITIONS, "default_group": "default"}
+    """获取分组列表 — 优先线上动态目录（当前可用模型所属分组 + 实时费率）"""
+    catalog = await get_catalog()
+    return {"groups": catalog["groups"], "default_group": catalog["groups"][0]["value"] if catalog["groups"] else "default",
+            "source": catalog["source"]}
 
 
 @router.get("/config/status")
@@ -204,5 +196,8 @@ async def get_settings():
 @router.post("/config/settings")
 async def save_settings(data: SettingsUpdateRequest):
     """保存设置到 .env 文件并立即生效"""
+    from backend.services.model_catalog import invalidate_cache
     save_settings_to_env(api_key=data.api_key, base_url=data.base_url)
+    # Key/地址变更后清空模型目录缓存，下次请求按新令牌重建（单飞锁内同步完成）
+    invalidate_cache()
     return {"success": True, "message": "设置已保存，即刻生效"}

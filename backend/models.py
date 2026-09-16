@@ -10,14 +10,15 @@ class ConfigUpdateRequest(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    prompt: str = Field(..., min_length=1, max_length=4000, description="图像描述文本")
+    prompt: str = Field(..., min_length=1, max_length=1000, description="图像描述文本（上游上限 1000 字符）")
     aspect_ratio: str = Field(default="1:1", description="画面比例")
     megapixels: str = Field(default="1", description="分辨率 (1/2/4)")
-    num_outputs: int = Field(default=1, ge=1, le=4, description="生成数量")
+    num_outputs: int = Field(default=1, ge=1, le=10, description="生成数量")
     output_format: str = Field(default="jpg", description="输出格式")
     output_quality: int = Field(default=80, ge=1, le=100, description="画质 1-100")
     num_inference_steps: int = Field(default=4, ge=1, le=50, description="推理步数")
-    model: str = Field(default="gpt-image-2", description="模型名称")
+    model: str = Field(default="gpt-image-2.5-flare-c", description="模型名称")
+    quality: str = Field(default="auto", description="画质档位 low/medium/high/xhigh/max/auto")
 
 
 class ImageInfo(BaseModel):
@@ -35,6 +36,7 @@ class GenerateResponse(BaseModel):
     status: str = ""
     request_data: dict = {}
     response_data: dict = {}
+    monitor_steps: list[dict] = []
     total_time: float = 0
 
 

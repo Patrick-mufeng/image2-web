@@ -13,6 +13,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from backend.config import settings
 from backend.services.openlux_client import openlux_client, OpenLuxAPIError
+from backend.services.image_utils import download_image, extract_images_from_payload
 from backend.services.history_store import history_store
 from backend.routers.config_routes import is_replicate_model, resolve_size
 
@@ -25,10 +26,10 @@ def _ts() -> str:
 
 @router.post("/edits")
 async def edit_image(
-    prompt: str = Form(..., min_length=1, max_length=4000),
+    prompt: str = Form(..., min_length=1, max_length=1000),
     model: str = Form("gpt-image-2"),
     size: str = Form("1024x1024"),
-    n: int = Form(1, ge=1, le=4),
+    n: int = Form(1, ge=1, le=10),
     quality: str = Form("auto"),
     background: str = Form("auto"),
     images: list[UploadFile] = File(..., description="图片文件，1-16张"),
@@ -114,25 +115,52 @@ async def edit_image(
             return f"/api/images/{fname}"
 
         img_counter = 0
-        for result in all_results:
-            # edits 接口返回 b64_json
+        for r_idx, result in enumerate(all_results):
+            # 兼容 b64_json（dict/list）、url、以及部分渠道的 chat.completion 结构
             data_field = result.get("data", {})
             if isinstance(data_field, dict) and data_field.get("b64_json"):
-                logs += f"[{_ts()}] 💾 保存图片 {img_counter+1}...\n"
-                local_path = _save_b64(data_field["b64_json"], img_counter)
-                images_out.append({"local_path": local_path, "revised_prompt": ""})
-                history_images.append({"local_path": local_path, "revised_prompt": ""})
-                img_counter += 1
+                items = [data_field]
             elif isinstance(data_field, list):
-                for item in data_field:
-                    if isinstance(item, dict) and item.get("b64_json"):
-                        logs += f"[{_ts()}] 💾 保存图片 {img_counter+1}/{img_counter+len(data_field)}...\n"
-                        local_path = _save_b64(item["b64_json"], img_counter)
+                items = [it for it in data_field if isinstance(it, dict)]
+            else:
+                items = []
+            if not items:
+                items = extract_images_from_payload(result)
+            if not items:
+                logs += f"[{_ts()}] ⚠️ 第 {r_idx+1} 个响应中未解析出图片\n"
+
+            for item in items:
+                if item.get("url"):
+                    logs += f"[{_ts()}] 📥 下载图片 {img_counter+1}...\n"
+                    local_path = await download_image(item["url"], task_id, img_counter)
+                    if local_path:
                         images_out.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
                         history_images.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
                         img_counter += 1
+                    else:
+                        logs += f"[{_ts()}] ⚠️ 图片 {img_counter+1} 下载失败，跳过\n"
+                elif item.get("b64_json"):
+                    logs += f"[{_ts()}] 💾 保存图片 {img_counter+1}...\n"
+                    local_path = _save_b64(item["b64_json"], img_counter)
+                    images_out.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
+                    history_images.append({"local_path": local_path, "revised_prompt": item.get("revised_prompt", "")})
+                    img_counter += 1
 
         elapsed = time.time() - t0
+        if not images_out:
+            # 不再静默成功：0 图显式失败，附原始响应供监控面板排查
+            err_msg = "API 返回成功但未解析出任何图片（响应结构不兼容或渠道异常）"
+            logs += f"[{_ts()}] ❌ {err_msg}\n"
+            from backend.services.log_store import log_store
+            log_store.add({
+                "type": "edit", "status": "failed",
+                "request": {"prompt": prompt[:150], "model": model, "size": size, "n": n, "image_count": len(images)},
+                "response_body": all_results[0] if all_results else {},
+                "total_time": elapsed, "error": err_msg,
+            })
+            return {"success": False, "error": err_msg, "status": "failed", "logs": logs,
+                    "response_data": all_results[0] if all_results else {},
+                    "total_time": round(elapsed, 1)}
         logs += f"[{_ts()}] ✅ 完成! 耗时: {elapsed:.1f}s\n"
 
         # 记录历史

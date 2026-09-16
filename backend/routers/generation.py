@@ -19,8 +19,9 @@ from backend.services.openlux_client import openlux_client, OpenLuxAPIError
 from backend.services.log_store import log_store
 from backend.services.history_store import history_store
 from backend.services.task_manager import task_manager
-from backend.services.image_utils import download_image, save_base64_image
-from backend.routers.config_routes import is_replicate_model, resolve_size
+from backend.services.image_utils import download_image, save_base64_image, extract_images_from_payload
+from backend.services.model_catalog import get_model_caps
+from backend.routers.config_routes import is_replicate_model, resolve_size_for_caps
 
 router = APIRouter()
 
@@ -47,15 +48,30 @@ async def generate_image(request: GenerateRequest):
     use_replicate = is_replicate_model(request.model)
     task_id = f"task_{uuid.uuid4().hex[:12]}"
 
+    # 按模型能力适配参数（目录来自 /v1/models + /api/pricing 动态拉取）
+    caps = get_model_caps(request.model)
+    num_outputs = request.num_outputs
+    n_clamped = False
+    if num_outputs > 1 and not caps.get("n", True):
+        num_outputs = 1
+        n_clamped = True
+
+    quality = request.quality if request.quality in caps.get("quality", ["auto"]) else "auto"
+    quality_param = quality if quality != "auto" and caps.get("quality") != ["auto"] else None
+    format_param = None
+    if caps.get("format") and request.output_format:
+        format_param = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp"}.get(request.output_format)
+
     request_data = {
         "model": request.model,
         "aspect_ratio": request.aspect_ratio,
         "megapixels": request.megapixels,
-        "num_outputs": request.num_outputs,
+        "num_outputs": num_outputs,
         "output_format": request.output_format,
         "output_quality": request.output_quality,
         "num_inference_steps": request.num_inference_steps,
-        "prompt": request.prompt[:150] + ("..." if len(request.prompt) > 150 else ""),
+        "quality": quality,
+        "prompt": request.prompt,
         "prompt_full_length": len(request.prompt),
     }
 
@@ -107,10 +123,18 @@ async def generate_image(request: GenerateRequest):
 
     else:
         # ═══ OpenAI 格式：同步执行，但按步骤写入日志 ═══
-        size = resolve_size(request.aspect_ratio, request.megapixels)
+        size, size_clamped = resolve_size_for_caps(request.aspect_ratio, request.megapixels, caps)
         logs = ""
         logs += f"[{ts()}] 🚀 开始生成 (OpenAI 即时模式)\n"
-        logs += f"[{ts()}] 模型: {request.model} | 尺寸: {size} | 数量: {request.num_outputs}\n"
+        logs += f"[{ts()}] 模型: {request.model} | 尺寸: {size} | 数量: {num_outputs}\n"
+        if size_clamped:
+            logs += f"[{ts()}] ℹ️ 该模型不支持所选分辨率（仅 1K 档），已自动收敛为 {size}\n"
+        if n_clamped:
+            logs += f"[{ts()}] ℹ️ 该模型暂不支持多张生成，已按 1 张处理\n"
+        if quality_param:
+            logs += f"[{ts()}] 画质: {quality}\n"
+        if format_param:
+            logs += f"[{ts()}] 格式: {format_param}\n"
         logs += f"[{ts()}] Prompt 长度: {len(request.prompt)} chars\n"
         monitor_steps.append({"step": "开始", "time": ts(), "elapsed": 0})
 
@@ -139,8 +163,12 @@ async def generate_image(request: GenerateRequest):
 
             result = await openlux_client.openai_generate(
                 prompt=request.prompt, model=request.model,
-                size=size, n=request.num_outputs,
+                size=size, n=num_outputs,
+                quality=quality_param, output_format=format_param,
             )
+            if result.pop("_fallback_minimal", False):
+                logs += f"[{ts()}] ℹ️ 参数被上游拒绝，已自动回退最小参数集成功\n"
+                task_manager.append_log(task_id, f"[{ts()}] ℹ️ 参数被上游拒绝，已自动回退最小参数集成功")
 
             t_api_end = time.time()
             api_duration = round(t_api_end - t_api_start, 1)
@@ -155,6 +183,9 @@ async def generate_image(request: GenerateRequest):
             # 兼容 API 返回单个对象而非列表的情况
             if isinstance(data_items, dict):
                 data_items = [data_items]
+            # 兼容部分渠道返回的 chat.completion 结构（图片内嵌在 choices[].message）
+            if not data_items:
+                data_items = extract_images_from_payload(result)
 
             t_dl_start = time.time()
             for idx, item in enumerate(data_items):
@@ -197,12 +228,21 @@ async def generate_image(request: GenerateRequest):
                 monitor_steps.append({"step": "图片下载/保存", "time": ts(), "elapsed": round(t_dl_end - t0, 2), "download_duration": download_duration})
 
             elapsed = time.time() - t0
-            if not images and len(data_items) > 0:
-                logs += f"[{ts()}] ⚠️ API 返回 {len(data_items)} 张但下载全部失败\n"
-                monitor_steps.append({"step": "下载失败", "time": ts(), "elapsed": round(elapsed, 1), "error": "全部下载失败"})
-            else:
-                logs += f"[{ts()}] ✅ 完成! 耗时: {elapsed:.1f}s (API: {api_duration}s, 下载: {download_duration}s)\n"
-                monitor_steps.append({"step": "完成", "time": ts(), "elapsed": round(elapsed, 1), "total": round(elapsed, 1)})
+            if not images:
+                # 上游 200 但拿不到图：不再静默成功，显式失败并附完整响应供排查
+                if data_items:
+                    err_msg = f"API 返回 {len(data_items)} 张图片但全部下载/保存失败"
+                else:
+                    err_msg = "API 返回 200 但未解析出任何图片（响应结构不兼容或渠道异常）"
+                logs += f"[{ts()}] ❌ {err_msg}\n"
+                monitor_steps.append({"step": "失败", "time": ts(), "elapsed": round(elapsed, 1), "error": err_msg})
+                return GenerateResponse(
+                    success=False, error=err_msg, status="failed",
+                    logs=logs, request_data=request_data, response_data=result,
+                    monitor_steps=monitor_steps, total_time=round(elapsed, 1),
+                )
+            logs += f"[{ts()}] ✅ 完成! 耗时: {elapsed:.1f}s (API: {api_duration}s, 下载: {download_duration}s)\n"
+            monitor_steps.append({"step": "完成", "time": ts(), "elapsed": round(elapsed, 1), "total": round(elapsed, 1)})
 
             # 记录历史
             history_store.add({
@@ -234,6 +274,7 @@ async def generate_image(request: GenerateRequest):
                 success=True, task_id=task_id, images=images,
                 status="succeeded", logs=logs,
                 request_data=request_data, response_data=result,
+                monitor_steps=monitor_steps,
                 total_time=elapsed,
             )
 
@@ -255,6 +296,7 @@ async def generate_image(request: GenerateRequest):
             return GenerateResponse(
                 success=False, error=full_err[:500], status="failed",
                 logs=err_log, request_data=request_data, response_data=err_detail,
+                monitor_steps=monitor_steps,
                 total_time=round(time.time() - t0, 1),
             )
         except Exception as e:
@@ -271,6 +313,7 @@ async def generate_image(request: GenerateRequest):
                 success=False, error=f"服务器错误: {full_err[:300]}", status="failed",
                 logs=err_log, request_data=request_data,
                 response_data={"error": full_err, "traceback": full_tb[-1000:]},
+                monitor_steps=monitor_steps,
                 total_time=round(time.time() - t0, 1),
             )
 
